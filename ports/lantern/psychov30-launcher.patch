@@ -1,5 +1,5 @@
 diff --git a/launcher/windows/BloodborneLauncher/Core/Choices.cs b/launcher/windows/BloodborneLauncher/Core/Choices.cs
-index 8443ac6..e678ef5 100644
+index 8443ac6..67433c5 100644
 --- a/launcher/windows/BloodborneLauncher/Core/Choices.cs
 +++ b/launcher/windows/BloodborneLauncher/Core/Choices.cs
 @@ -1,4 +1,4 @@
@@ -24,7 +24,7 @@ index 8443ac6..e678ef5 100644
 -            new(L.T("Native (default)"), "native"), new(L.T("Expanded"), "expand"),
 +            new(L.T("Native"), "native"), new(L.T("Expanded"), "expand"),
 +            new("HDR16 (16-bit, restart)", "psychov30",
-+                "Vanilla+ by souperman9 (RenoDX Bloodborne mod). PsychoV-30 — RenoDX · © 2026 Carlos Lopez · MIT License. GLSL adaptation for bbport. github.com/clshortfuse/renodx"),
++                "HDR16 by LRF17 (github.com/LRF17/LanternEngine-HDR16). Tone mappers: Vanilla+ by souperman9 (from his RenoDX Bloodborne mod); PsychoV-30 from RenoDX (© 2026 Carlos Lopez, MIT License, github.com/clshortfuse/renodx)."),
          };
  
 -        public static readonly Choice[] HdrBoost =

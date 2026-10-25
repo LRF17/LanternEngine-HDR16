@@ -8554,10 +8554,10 @@ index acec36c..772e9bf 100644
          std::vector<MirrorView> views;
          vk::Format format{};
 diff --git a/gpu/shim/bbport_overlay.cpp b/gpu/shim/bbport_overlay.cpp
-index 93b5634..b3d3042 100644
+index 93b5634..f1d19f2 100644
 --- a/gpu/shim/bbport_overlay.cpp
 +++ b/gpu/shim/bbport_overlay.cpp
-@@ -405,6 +405,330 @@ const char* Item(const char* english, const char* russian = nullptr) {
+@@ -405,6 +405,331 @@ const char* Item(const char* english, const char* russian = nullptr) {
      return russian ? BbSettings::MenuText(english, russian) : BbSettings::MenuText(english);
  }
  
@@ -8879,16 +8879,17 @@ index 93b5634..b3d3042 100644
 +        Hint("BB_GPU_LOG=info: the HDR trace lines in the log.");
 +    }
 +    ImGui::SeparatorText("About");
++    ImGui::TextDisabled("HDR16 by LRF17 (github.com/LRF17/LanternEngine-HDR16).");
 +    ImGui::TextDisabled("PsychoV-30 and this menu's layout from RenoDX");
 +    ImGui::TextDisabled("(github.com/clshortfuse/renodx, Carlos Lopez and contributors, MIT).");
-+    ImGui::TextDisabled("Vanilla+ by souperman9 (RenoDX Bloodborne mod).");
++    ImGui::TextDisabled("Tone mapper Vanilla+ by souperman9 (from his RenoDX Bloodborne mod).");
 +}
 +
 +// HDR output (lantern.ini hdr*): on/off on restart; paper white, peak and boost live.
  void HdrSection() {
      auto& s = BbSettings::Get();
      Section("HDR output", "Вывод HDR");
-@@ -439,22 +763,39 @@ void HdrSection() {
+@@ -439,22 +764,39 @@ void HdrSection() {
      }
      int mode = std::clamp(s.hdr_mode.load(), 0, BbSettings::HdrModeCount - 1);
      if (const char* label = Item("HDR mode", "Режим HDR")) {
@@ -8928,7 +8929,7 @@ index 93b5634..b3d3042 100644
      if (const char* label = Item("Paper white (nits)", "Белый SDR (нит)")) {
          Slider(label, s.hdr_paper_white, BbSettings::HdrPaperWhiteMin, BbSettings::HdrPaperWhiteMax, "%.0f",
                 ImGuiSliderFlags_AlwaysClamp);
-@@ -499,19 +840,19 @@ void HdrSection() {
+@@ -499,19 +841,19 @@ void HdrSection() {
              "1 — весь (до пика). Меняются сразу. Ctrl+клик по ползунку — ввести точное значение."));
      }
      if (mode == BbSettings::HdrModeNative) {
@@ -8953,7 +8954,7 @@ index 93b5634..b3d3042 100644
                  "1 — более насыщенные, как на мониторе с широким охватом в SDR (привычный вид; точный sRGB "
                  "рядом с ним может казаться блёклым). Меняются сразу."));
          }
-@@ -551,6 +892,9 @@ void PictureSection() {
+@@ -551,6 +893,9 @@ void PictureSection() {
              "0.25-8)."));
      }
      const bool vignette = s.graphics_vignette;
@@ -8963,7 +8964,7 @@ index 93b5634..b3d3042 100644
      bool moved = false;
      const auto slider = [&](const char* english, const char* russian, std::atomic<float>& value, float lo,
                              float hi, const char* format = "%.2f") {
-@@ -558,12 +902,16 @@ void PictureSection() {
+@@ -558,12 +903,16 @@ void PictureSection() {
              moved |= Slider(label, value, lo, hi, format);
          }
      };
@@ -8984,7 +8985,7 @@ index 93b5634..b3d3042 100644
      if (const char* label = Item("Vignette", "Виньетка")) {
          Checkbox(label, s.graphics_vignette);
          moved |= vignette != s.graphics_vignette;
-@@ -587,6 +935,17 @@ void PictureSection() {
+@@ -587,6 +936,17 @@ void PictureSection() {
          }
      }
      ImGui::EndDisabled();
@@ -9002,7 +9003,7 @@ index 93b5634..b3d3042 100644
  }
  
  void EffectsSection() {
-@@ -1687,6 +2046,7 @@ void Menu() {
+@@ -1687,6 +2047,7 @@ void Menu() {
      bool restart =
          s.object_motion != s.startup_object_motion || s.model_lod != s.startup_model_lod ||
          s.live_resolution != s.startup_live_resolution || s.hdr != s.startup_hdr ||
@@ -9010,7 +9011,7 @@ index 93b5634..b3d3042 100644
          BbSettings::ResolutionNeedsRestart();
      for (int e = 0; e < BbSettings::EffectCount; ++e) {
          restart |= s.effects[e] != s.startup_effects[e];
-@@ -2025,6 +2385,11 @@ bool HandleEvent(const SDL_Event& event) {
+@@ -2025,6 +2386,11 @@ bool HandleEvent(const SDL_Event& event) {
      case SDL_EVENT_KEY_DOWN:
      case SDL_EVENT_KEY_UP: {
          const bool down = event.type == SDL_EVENT_KEY_DOWN;
