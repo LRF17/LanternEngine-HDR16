@@ -23,7 +23,7 @@ namespace BloodborneLauncher.Core
     /// </summary>
     public static class Updater
     {
-        public const string Repository = "Cham17-dev/LanternEngine";
+        public const string Repository = "LRF17/LanternEngine-NativePlusHDR";
         public static string ReleasesPage => $"https://github.com/{Repository}/releases";
 
         /// <summary>The engine build this launcher is made for (package.json "engine").</summary>

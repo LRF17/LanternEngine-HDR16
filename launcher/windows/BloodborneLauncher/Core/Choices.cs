@@ -238,8 +238,8 @@ namespace BloodborneLauncher.Core
         public static readonly Choice[] HdrMode =
         {
             new(L.T("Native"), "native"), new(L.T("Expanded"), "expand"),
-            new("HDR16 (16-bit, restart)", "psychov30",
-                "HDR16 by LRF17 (github.com/LRF17/LanternEngine-HDR16). Tone mappers: Vanilla+ by souperman9 (from his RenoDX Bloodborne mod); PsychoV-30 from RenoDX (© 2026 Carlos Lopez, MIT License, github.com/clshortfuse/renodx)."),
+            new("Native+ (restart)", "psychov30",
+                "Native+ HDR by LRF17 (github.com/LRF17/LanternEngine-NativePlusHDR). Tone mappers: Vanilla+ by souperman9 (from his RenoDX Bloodborne mod); PsychoV-30 from RenoDX (© 2026 Carlos Lopez, MIT License, github.com/clshortfuse/renodx)."),
         };
 
         /// <summary>hdr_tonemapper with HDR16 (hdr_mode=psychov30, bbport_settings.h): 5 Vanilla+ (souperman9's, RenoDX's Bloodborne mod; the default), 4 PsychoV-30 (as RenoDX's mods), 2 Vanilla. 3 (Hybrid) is bbport.ini only.</summary>

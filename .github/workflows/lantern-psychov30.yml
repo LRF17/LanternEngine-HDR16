@@ -1,4 +1,4 @@
-name: Lantern HDR16 port
+name: Lantern Native+ HDR port
 
 on:
   push:
@@ -96,7 +96,7 @@ jobs:
         run: |
           $v = if ($env:TAG) { $env:TAG } else { Get-Content ports/lantern/VERSION -TotalCount 1 }
           $v = $v.Trim().TrimStart('v', 'V')
-          # 0.9.37, 0.9.37-beta.2, or an HDR16 fix of that Lantern version: 0.9.37.1(-beta.1).
+          # 0.9.37, 0.9.37-beta.2, or a Native+ HDR fix of that Lantern version: 0.9.37.1(-beta.1).
           if ($v -notmatch '^\d+\.\d+\.\d+(\.\d+)?(-[0-9A-Za-z.]+)?$') { throw "Unexpected version '$v'" }
           "full=$v" >> $env:GITHUB_OUTPUT
           "number=$(($v -split '-')[0])" >> $env:GITHUB_OUTPUT
@@ -128,7 +128,7 @@ jobs:
           export CFLAGS=-Wno-error=unused-but-set-global
           export CXXFLAGS="-include $(cygpath -m "$PWD/gpu/win_compat.h")"
           bash build.sh
-      - name: Apply separate HDR16 patches
+      - name: Apply separate Native+ HDR patches
         run: python ports/lantern/prepare.py engine-src upstream-lantern
       # Link-time optimization on, as Lantern's own builds (build.sh's default).
       - name: Build HDR engine and settings tests
@@ -147,7 +147,7 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '8.0.x'
-      - name: Build launcher with HDR16
+      - name: Build launcher with Native+ HDR
         run: >-
           dotnet publish launcher/windows/BloodborneLauncher/BloodborneLauncher.csproj
           -c Release -r win-x64 --self-contained true
@@ -188,8 +188,8 @@ jobs:
           VERSION: ${{ steps.version.outputs.full }}
         run: |
           New-Item -ItemType Directory release-files, pack | Out-Null
-          Copy-Item distribution pack/LanternEngine-HDR16 -Recurse
-          7z a -tzip -mx=5 "release-files/LanternEngine-HDR16-v$env:VERSION-win64.zip" ./pack/LanternEngine-HDR16
+          Copy-Item distribution pack/LanternEngine-NativePlusHDR -Recurse
+          7z a -tzip -mx=5 "release-files/LanternEngine-NativePlusHDR-v$env:VERSION-win64.zip" ./pack/LanternEngine-NativePlusHDR
           if ($LASTEXITCODE -ne 0) { throw "7z failed" }
           Copy-Item "distribution/Lantern Engine.exe", distribution/package.json release-files/
           Get-ChildItem release-files | Format-Table Name, Length

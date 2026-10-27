@@ -8554,7 +8554,7 @@ index acec36c..772e9bf 100644
          std::vector<MirrorView> views;
          vk::Format format{};
 diff --git a/gpu/shim/bbport_overlay.cpp b/gpu/shim/bbport_overlay.cpp
-index 93b5634..f1d19f2 100644
+index 93b5634..59f63c3 100644
 --- a/gpu/shim/bbport_overlay.cpp
 +++ b/gpu/shim/bbport_overlay.cpp
 @@ -405,6 +405,331 @@ const char* Item(const char* english, const char* russian = nullptr) {
@@ -8661,15 +8661,15 @@ index 93b5634..f1d19f2 100644
 +void PsychoSection(BbSettings::Values& s) {
 +    if (!s.startup_psychov30) {
 +        ImGui::TextColored(ImVec4(1.0f, 0.75f, 0.3f, 1.0f), "%s",
-+                           BbSettings::MenuText("HDR16 starts with the next game start.",
-+                                                "HDR16 включится при следующем запуске игры."));
++                           BbSettings::MenuText("Native+ starts with the next game start.",
++                                                "Native+ включится при следующем запуске игры."));
 +    } else if (s.hdr_native16_live) {
 +        ImGui::TextColored(ImVec4(0.45f, 0.9f, 0.45f, 1.0f), "%s",
-+                           BbSettings::MenuText("HDR 16-bit: active", "HDR 16 бит: активен"));
++                           BbSettings::MenuText("Native+: active", "Native+: активен"));
 +    } else {
 +        ImGui::TextColored(ImVec4(1.0f, 0.75f, 0.3f, 1.0f), "%s",
-+                           BbSettings::MenuText("HDR 16-bit: not active here (shown in SDR)",
-+                                                "HDR 16 бит: здесь не активен (показ в SDR)"));
++                           BbSettings::MenuText("Native+: not active here (shown in SDR)",
++                                                "Native+: здесь не активен (показ в SDR)"));
 +    }
 +
 +    static const char* presets[] = {"Off", "Preset #1", "Preset #2", "Preset #3"};
@@ -8865,7 +8865,7 @@ index 93b5634..f1d19f2 100644
 +                                       "5. Copy above white",
 +                                       "6. Final pass: colors outside BT.709",
 +                                       "7. Final pass: HUD"};
-+        s.hdr_native16_probe = ComboIndex("16-bit probe", s.hdr_native16_probe, probes, 8, 0);
++        s.hdr_native16_probe = ComboIndex("Test probe", s.hdr_native16_probe, probes, 8, 0);
 +        Hint(BbSettings::MenuText(
 +            "6: magenta where a color outside BT.709 (Target gamut BT.2020) reaches the final pass, "
 +            "a BT.709 channel below 0 kept to the end. 7: red over what the final pass takes as the "
@@ -8873,13 +8873,13 @@ index 93b5634..f1d19f2 100644
 +            "6: пурпурный там, где цвет вне BT.709 (Target gamut BT.2020) доходит до финального "
 +            "прохода с отрицательным каналом BT.709. 7: красный там, где финальный проход видит "
 +            "интерфейс (HUD). Не сохраняется."));
-+        if (ImGui::Button("Log the 16-bit chain (one frame)")) {
++        if (ImGui::Button("Log the HDR chain (one frame)")) {
 +            s.hdr_chain_trace = true;
 +        }
 +        Hint("BB_GPU_LOG=info: the HDR trace lines in the log.");
 +    }
 +    ImGui::SeparatorText("About");
-+    ImGui::TextDisabled("HDR16 by LRF17 (github.com/LRF17/LanternEngine-HDR16).");
++    ImGui::TextDisabled("Native+ HDR by LRF17 (github.com/LRF17/LanternEngine-NativePlusHDR).");
 +    ImGui::TextDisabled("PsychoV-30 and this menu's layout from RenoDX");
 +    ImGui::TextDisabled("(github.com/clshortfuse/renodx, Carlos Lopez and contributors, MIT).");
 +    ImGui::TextDisabled("Tone mapper Vanilla+ by souperman9 (from his RenoDX Bloodborne mod).");
@@ -8889,7 +8889,7 @@ index 93b5634..f1d19f2 100644
  void HdrSection() {
      auto& s = BbSettings::Get();
      Section("HDR output", "Вывод HDR");
-@@ -439,22 +764,39 @@ void HdrSection() {
+@@ -439,22 +764,41 @@ void HdrSection() {
      }
      int mode = std::clamp(s.hdr_mode.load(), 0, BbSettings::HdrModeCount - 1);
      if (const char* label = Item("HDR mode", "Режим HDR")) {
@@ -8897,18 +8897,20 @@ index 93b5634..f1d19f2 100644
          const char* modes[BbSettings::HdrModeCount] = {
              BbSettings::MenuText("Native (from the game's HDR scene)", "Нативный (из HDR-сцены игры)"),
              BbSettings::MenuText("Expand (from the SDR picture)", "Расширение (из SDR-картинки)"),
-+            "HDR16 (16-bit, restart required)",
++            "Native+ (restart required)",
          };
          const bool mode_changed = ImGui::Combo(label, &mode, modes, BbSettings::HdrModeCount);
          Store(s.hdr_mode, mode, mode_changed);
          Hint(BbSettings::MenuText(
-+            "HDR16: the game's own light in 16 bits, tone mapped by Vanilla+ or PsychoV-30, with the "
++            "Native+: the light of the game's scene kept to the screen, tone mapped to your display's "
++            "peak by Vanilla+ or PsychoV-30, with the "
 +            "RenoDX-style settings below; entering or leaving it applies after restarting the game. "
              "Native: the brightness of lamps, fire, the moon and other highlights comes from the "
              "game's own HDR scene, before its tonemap clipped it to SDR white. Midtones, colours and "
              "the UI stay as in the SDR picture. Menus, loading screens and movies (no scene) use "
              "Expand. Expand: the SDR picture's brightest parts are stretched towards the peak.",
-+            "HDR16: собственный свет игры в 16 битах, тонмаппинг Vanilla+ или PsychoV-30, с "
++            "Native+: свет сцены игры сохраняется до экрана, тонмаппинг под пик дисплея Vanilla+ "
++            "или PsychoV-30, с "
 +            "настройками в стиле RenoDX ниже; включение и выключение применяются после перезапуска. "
              "Нативный: яркость ламп, огня, луны и других светлых мест берётся из собственной "
              "HDR-сцены игры, до того как тонмаппинг обрезал её до белого SDR. Средние тона, цвета и "
@@ -8923,13 +8925,13 @@ index 93b5634..f1d19f2 100644
 +    }
 +    if (s.startup_psychov30 && WholeSection() && Shown("HDR output", "Вывод HDR")) {
 +        ImGui::TextColored(ImVec4(1.0f, 0.75f, 0.3f, 1.0f), "%s",
-+                           BbSettings::MenuText("HDR16 stays on until the game restarts.",
-+                                                "HDR16 работает до перезапуска игры."));
++                           BbSettings::MenuText("Native+ stays on until the game restarts.",
++                                                "Native+ работает до перезапуска игры."));
 +    }
      if (const char* label = Item("Paper white (nits)", "Белый SDR (нит)")) {
          Slider(label, s.hdr_paper_white, BbSettings::HdrPaperWhiteMin, BbSettings::HdrPaperWhiteMax, "%.0f",
                 ImGuiSliderFlags_AlwaysClamp);
-@@ -499,19 +841,19 @@ void HdrSection() {
+@@ -499,19 +843,19 @@ void HdrSection() {
              "1 — весь (до пика). Меняются сразу. Ctrl+клик по ползунку — ввести точное значение."));
      }
      if (mode == BbSettings::HdrModeNative) {
@@ -8954,7 +8956,7 @@ index 93b5634..f1d19f2 100644
                  "1 — более насыщенные, как на мониторе с широким охватом в SDR (привычный вид; точный sRGB "
                  "рядом с ним может казаться блёклым). Меняются сразу."));
          }
-@@ -551,6 +893,9 @@ void PictureSection() {
+@@ -551,6 +895,9 @@ void PictureSection() {
              "0.25-8)."));
      }
      const bool vignette = s.graphics_vignette;
@@ -8964,7 +8966,7 @@ index 93b5634..f1d19f2 100644
      bool moved = false;
      const auto slider = [&](const char* english, const char* russian, std::atomic<float>& value, float lo,
                              float hi, const char* format = "%.2f") {
-@@ -558,12 +903,16 @@ void PictureSection() {
+@@ -558,12 +905,16 @@ void PictureSection() {
              moved |= Slider(label, value, lo, hi, format);
          }
      };
@@ -8985,17 +8987,17 @@ index 93b5634..f1d19f2 100644
      if (const char* label = Item("Vignette", "Виньетка")) {
          Checkbox(label, s.graphics_vignette);
          moved |= vignette != s.graphics_vignette;
-@@ -587,6 +936,17 @@ void PictureSection() {
+@@ -587,6 +938,17 @@ void PictureSection() {
          }
      }
      ImGui::EndDisabled();
 +    if (hdr_grading && WholeSection() && Shown("Picture", "Изображение")) {
 +        ImGui::PushTextWrapPos();
 +        ImGui::TextDisabled("%s", BbSettings::MenuText(
-+            "HDR16: brightness, contrast, saturation and bloom are set in the HDR section "
++            "Native+: brightness, contrast, saturation and bloom are set in the HDR section "
 +            "(Exposure, Contrast, Saturation, Bloom); the game's own ones stay as drawn here "
 +            "and in the game's PC Colour menu.",
-+            "HDR16: яркость, контраст, насыщенность и bloom задаются в разделе HDR "
++            "Native+: яркость, контраст, насыщенность и bloom задаются в разделе HDR "
 +            "(Exposure, Contrast, Saturation, Bloom); собственные значения игры здесь и в меню PC "
 +            "Colour не меняются."));
 +        ImGui::PopTextWrapPos();
@@ -9003,7 +9005,7 @@ index 93b5634..f1d19f2 100644
  }
  
  void EffectsSection() {
-@@ -1687,6 +2047,7 @@ void Menu() {
+@@ -1687,6 +2049,7 @@ void Menu() {
      bool restart =
          s.object_motion != s.startup_object_motion || s.model_lod != s.startup_model_lod ||
          s.live_resolution != s.startup_live_resolution || s.hdr != s.startup_hdr ||
@@ -9011,7 +9013,7 @@ index 93b5634..f1d19f2 100644
          BbSettings::ResolutionNeedsRestart();
      for (int e = 0; e < BbSettings::EffectCount; ++e) {
          restart |= s.effects[e] != s.startup_effects[e];
-@@ -2025,6 +2386,11 @@ bool HandleEvent(const SDL_Event& event) {
+@@ -2025,6 +2388,11 @@ bool HandleEvent(const SDL_Event& event) {
      case SDL_EVENT_KEY_DOWN:
      case SDL_EVENT_KEY_UP: {
          const bool down = event.type == SDL_EVENT_KEY_DOWN;
