@@ -60,7 +60,7 @@ def assemble(engine, overlay, destination, cache):
                         ignore=shutil.ignore_patterns('__pycache__', '*.pyc'))
     shutil.copytree(overlay / 'out', runtime / 'out', dirs_exist_ok=True)
     shutil.copytree(overlay / 'licenses', destination / 'licenses', dirs_exist_ok=True)
-    shutil.copy2(overlay / 'README-HDR16.md', destination / 'README-HDR16.md')
+    shutil.copy2(overlay / 'README-NativePlusHDR.md', destination / 'README-NativePlusHDR.md')
     # The launcher build is Lantern Engine.exe since Lantern 9.8 (Bloodborne Launcher.exe before).
     launcher = overlay / 'Lantern Engine.exe'
     if not launcher.is_file():
@@ -78,7 +78,7 @@ def assemble(engine, overlay, destination, cache):
                                                         .read_text(encoding='utf-8').strip())
     (destination / 'package.json').write_text(json.dumps({
         'version': version, 'engine': 'lantern-d901fbd-hdr16-v1',
-        'source': 'https://github.com/Cham17-dev/LanternEngine/tree/lantern-HDR16',
+        'source': 'https://github.com/LRF17/LanternEngine-NativePlusHDR/tree/lantern-Native+HDR',
         'runtime_resources': 'v0.9.37', 'python': '3.12.10',
     }, indent=2), encoding='utf-8')
     # Explicit shipped HDR defaults in the shipped settings (engine\lantern.default.ini, which the
@@ -104,7 +104,7 @@ def assemble(engine, overlay, destination, cache):
     # out\ at the top is the layout before engine\ (bb-start.exe in engine\out is ours, built here).
     if (destination / 'out').exists():
         raise RuntimeError('Mixed engine layouts in distribution')
-    print(f'Complete HDR16 package: {destination}')
+    print(f'Complete Native+ HDR package: {destination}')
 
 
 if __name__ == '__main__':

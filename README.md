@@ -1,7 +1,7 @@
-# Lantern Engine + HDR16 (experimental)
+# Lantern Engine Native+ HDR (experimental)
 
 HDR for Bloodborne on [Lantern Engine](https://github.com/Awakenchan/LanternEngine) by Awaken.
-**HDR16** keeps the game's own light in 16 bits from the scene to the screen and tone maps it to
+**Native+** keeps the light of the game's scene all the way to the screen and tone maps it to
 your display's peak, with a menu laid out like a RenoDX mod. Two tone mappers:
 
 - **Vanilla+** (default), by **souperman9**, from his RenoDX Bloodborne mod: the game's own image,
@@ -20,14 +20,14 @@ Lantern's own README and credits are in [README-Lantern.md](README-Lantern.md).
 
 ## Install
 
-1. Download the package (`LanternEngine-HDR16-v<version>-win64.zip`) from this fork's
-   [Releases](https://github.com/Cham17-dev/LanternEngine/releases) and extract it into a **new,
+1. Download the package (`LanternEngine-NativePlusHDR-v<version>-win64.zip`) from this fork's
+   [Releases](https://github.com/LRF17/LanternEngine-NativePlusHDR/releases) and extract it into a **new,
    empty folder**. It is a complete package: do not merge it into another Lantern release.
 2. Start **Lantern Engine.exe** (or `Bloodborne.exe`, its shortcut). The window title is
-   **Lantern Engine + HDR16**. Select your game dump (the folder with `eboot.bin`); game data is
+   **Lantern Engine Native+ HDR**. Select your game dump (the folder with `eboot.bin`); game data is
    not included.
 3. Turn on HDR in Windows (*Settings > System > Display > Use HDR*), then **HDR output** in the
-   launcher's Display page. The HDR source is **HDR16** by default.
+   launcher's Display page. The HDR source is **Native+** by default.
 4. Your saves stay in your old installation: select your existing user folder in the launcher's
    profile settings, or copy the saves with the game closed (keep a backup). Do not copy an old
    engine, executables or a complete settings file into this package.
@@ -44,19 +44,19 @@ the launcher, or use *Reset all*.
 ## Tips
 
 - **Tested on NVIDIA only.** AMD and Intel GPUs should work since 0.9.37 beta 2 but have not
-  been tested: if HDR16 stays in SDR there, please send the log (`logs/last_session.log`).
+  been tested: if Native+ stays in SDR there, please send the log (`logs/last_session.log`).
 - Keep the game's own **Brightness** option (in its in-game settings) at **5**. It still changes
   the whole image, shadows first.
 - **Peak Brightness** follows what Windows reports for your display (the launcher's "Peak
   brightness from the display"). Moving the slider sets it by hand; its reset button goes back
   to the display's.
-- Changing the HDR source (HDR16, Native, Expanded) needs a game restart; everything in the
-  HDR16 menu applies live.
-- Frame generation works in HDR16: **DLSS** (NVIDIA RTX 40/50) and **FSR 3.1** (any GPU), which
-  interpolates HDR16's 16-bit frames. With FSR 3.1 the HUD of the generated frames is shown at
+- Changing the HDR source (Native+, Native, Expanded) needs a game restart; everything in the
+  Native+ menu applies live.
+- Frame generation works in Native+: **DLSS** (NVIDIA RTX 40/50) and **FSR 3.1** (any GPU), which
+  interpolates Native+'s frames as they are. With FSR 3.1 the HUD of the generated frames is shown at
   Game Brightness: keep UI Brightness at the same value (both 203 nits by default), or the HUD
   flickers.
-- HDR16 uses Lantern's native shader compiler, its shader catalog and the same shader cache as
+- Native+ uses Lantern's native shader compiler, its shader catalog and the same shader cache as
   the other modes: switching the HDR source does not rebuild the shaders.
 
 ## Settings
@@ -87,7 +87,7 @@ The in-game menu opens with **Insert** (or L3+R3). Every setting applies live an
 | Debug *(Advanced)* | | Compare (**F9**: HDR / the game's SDR image), test probes, chain log. |
 
 The launcher's Display page also has Tone mapper, Target gamut, Peak brightness, Paper white and
-UI brightness, with the same defaults and reset buttons. In HDR16, the game's own Brightness,
+UI brightness, with the same defaults and reset buttons. In Native+, the game's own Brightness,
 Contrast, Saturation and Bloom in the port's Picture section (and the game's PC Colour menu) are
 left as the game draws them: the HDR settings above replace them.
 
@@ -103,7 +103,7 @@ left as the game draws them: the HDR settings above replace them.
 
 ## How it works
 
-- **16-bit chain.** The game draws its final image in 8 bits, clipped at white. HDR16 replaces
+- **16-bit chain.** The game draws its final image in 8 bits, clipped at white. Native+ replaces
   the game's final composite: the scene is tone mapped there (Vanilla+ or PsychoV-30), and every
   pass after it (the color table, the upscaler, the display copy) runs in 16-bit float, so the
   light above white reaches the screen. The final pass converts to HDR10 (or scRGB).
@@ -129,15 +129,15 @@ Lantern's `engine/`, applies the patches, builds the engine and launcher, checks
 - LanternEngine `d901fbd2ea4bea114b37c26a2a9278d1e97f7b46` (0.9.37).
 - RenoDX `b6b32f47789ff9d0e640a0e0db6c9421b5397f34` (shader checks).
 
-HDR16 needs a GPU with 176 bytes of Vulkan push constants (checked at startup). Its
+Native+ needs a GPU with 176 bytes of Vulkan push constants (checked at startup). Its
 replacements of the game's composite, color table and copies are built for each way the game
 shader can be compiled: inputs read per vertex (fragment-shader barycentrics, the recompiler's
 exact interpolation on NVIDIA) or as the GPU interpolates them (Lantern 0.9.37's hardware
 interpolation, AMD, Intel), and for the composite the constant buffer as a storage buffer
 (legacy compiler) or a uniform buffer (native compiler). The engine picks one per game shader and
-says which in the log. The shader cache holds the game's own shaders; HDR16 swaps its
+says which in the log. The shader cache holds the game's own shaders; Native+ swaps its
 replacements in when they load, so all modes, Lantern's shader catalog and its cache recompiles
-(`bb-shader-lab.exe`) share it. With `BB_UBO_DWORDS=0` or `BB_UBO_EXACT=1`, HDR16 keeps the
+(`bb-shader-lab.exe`) share it. With `BB_UBO_DWORDS=0` or `BB_UBO_EXACT=1`, Native+ keeps the
 legacy compiler.
 
 ## Credits and licenses
