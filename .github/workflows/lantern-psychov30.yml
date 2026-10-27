@@ -74,6 +74,10 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: 120
     steps:
+      # The workspace path holds the repository's name twice (D:\a\<name>\<name>\): with
+      # LanternEngine-NativePlusHDR, Lantern's deepest files pass Windows' 260 characters.
+      - name: Long paths in git
+        run: git config --system core.longpaths true
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
