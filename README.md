@@ -43,8 +43,8 @@ the launcher, or use *Reset all*.
 
 ## Tips
 
-- **Tested on NVIDIA only.** AMD and Intel GPUs should work since 0.9.37 beta 2 but have not
-  been tested: if Native+ stays in SDR there, please send the log (`logs/last_session.log`).
+- **Tested on NVIDIA and AMD** (an RX 6800 XT). Intel GPUs should work but have not been tested:
+  if Native+ stays in SDR there, please send the log (`logs/last_session.log`).
 - Keep the game's own **Brightness** option (in its in-game settings) at **5**. It still changes
   the whole image, shadows first.
 - **Peak Brightness** follows what Windows reports for your display (the launcher's "Peak
@@ -119,14 +119,14 @@ left as the game draws them: the HDR settings above replace them.
 
 ## Build from source
 
-This fork carries reproducible patches over Lantern 0.9.37: `ports/lantern/psychov30-engine.patch`
+This fork carries reproducible patches over Lantern 0.9.38: `ports/lantern/psychov30-engine.patch`
 on Lantern's `engine/` (the engine's full source since 0.9.37) and `psychov30-launcher.patch` on
 its launcher (this fork's `launcher/` already holds it). The GitHub workflow copies the pinned
 Lantern's `engine/`, applies the patches, builds the engine and launcher, checks the HDR shaders
 (against RenoDX's own code for the color bridge) and assembles the package with the official
-0.9.37 runtime files (DLLs, models, shader catalogs). Pinned inputs:
+0.9.38 runtime files (DLLs, models, shader catalogs). Pinned inputs:
 
-- LanternEngine `d901fbd2ea4bea114b37c26a2a9278d1e97f7b46` (0.9.37).
+- LanternEngine `4715bca355059b7bd981ca849412884059d4d0a7` (0.9.38).
 - RenoDX `b6b32f47789ff9d0e640a0e0db6c9421b5397f34` (shader checks).
 
 Native+ needs a GPU with 176 bytes of Vulkan push constants (checked at startup). Its

@@ -119,13 +119,14 @@ namespace BloodborneLauncher.Core
                 // The first line of every log, the Output page's export included: which build ran.
                 Emit($"Lantern Engine Native+ HDR {Updater.CurrentLabel}, engine {Updater.LocalEngine() ?? "unknown"}, {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
                 Emit($"HDR engine: {Path.Combine(Paths.BinariesDir, "bb-probe.exe")}");
-                process.OutputDataReceived += (_, e) => { if (e.Data != null) Emit(e.Data); };
+                process.OutputDataReceived += (_, e) => { if (e.Data != null && !LiveGame.Take(e.Data)) Emit(e.Data); };
                 process.ErrorDataReceived += (_, e) => { if (e.Data != null) Emit(e.Data); };
                 process.Exited += (_, _) =>
                 {
                     var code = -1;
                     try { process.WaitForExit(); code = process.ExitCode; } catch { /* gone */ }
                     _process = null;
+                    LiveGame.Clear();
                     CloseLog();
                     Exited?.Invoke(code);
                 };
