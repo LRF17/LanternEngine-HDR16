@@ -4,7 +4,7 @@ on:
   push:
     # '+' is a pattern character in branch filters (one or more of the one before): escaped.
     branches: ['lantern-Native\+HDR', 'lantern-Native\+HDR-beta']
-    paths: ['ports/lantern/**', 'launcher/**', 'engine/**', 'README.md', '.github/workflows/lantern-psychov30.yml']
+    paths: ['ports/lantern/**', 'launcher/**', 'engine/**', 'README.md', '.github/workflows/lantern-nativeplus.yml']
   # A release published on GitHub (tag v<version>, e.g. v0.9.37-beta.1): built with that
   # version, its package, launcher and package.json attached to it (job publish).
   release:
@@ -182,7 +182,7 @@ jobs:
         run: python ports/lantern/package_check.py distribution
       - uses: actions/upload-artifact@v4
         with:
-          name: lantern-psychov30-package
+          name: lantern-nativeplus-package
           path: distribution/
       # A release's files, as the launcher's updater reads them (Updater.cs): the package zip,
       # Lantern Engine.exe on its own and package.json.
@@ -201,7 +201,7 @@ jobs:
       - if: github.event_name == 'release'
         uses: actions/upload-artifact@v4
         with:
-          name: lantern-psychov30-release
+          name: lantern-nativeplus-release
           path: release-files/
       - name: Upload build log on failure
         if: failure()
@@ -218,7 +218,7 @@ jobs:
     steps:
       - uses: actions/download-artifact@v4
         with:
-          name: lantern-psychov30-release
+          name: lantern-nativeplus-release
           path: release-files
       - name: Attach the files to the release
         env:

@@ -238,22 +238,17 @@ namespace BloodborneLauncher.Core
         public static readonly Choice[] HdrMode =
         {
             new(L.T("Native"), "native"), new(L.T("Expanded"), "expand"),
-            new("Native+ (restart)", "psychov30",
+            new("Native+ (restart)", "nativeplus",
                 "Native+ HDR by LRF17 (github.com/LRF17/LanternEngine-NativePlusHDR). Tone mappers: Vanilla+ by souperman9 (from his RenoDX Bloodborne mod); PsychoV-30 from RenoDX (© 2026 Carlos Lopez, MIT License, github.com/clshortfuse/renodx)."),
         };
 
-        /// <summary>hdr_tonemapper with HDR16 (hdr_mode=psychov30, bbport_settings.h): 5 Vanilla+ (souperman9's, RenoDX's Bloodborne mod; the default), 4 PsychoV-30 (as RenoDX's mods), 2 Vanilla. 3 (Hybrid) is bbport.ini only.</summary>
+        /// <summary>hdr_tonemapper with Native+ (hdr_mode=nativeplus): 5 Vanilla+ (souperman9's, from his RenoDX Bloodborne mod; the default) or 4 PsychoV-30 (as RenoDX's mods).</summary>
         public static readonly Choice[] HdrToneMapper =
         {
             // The segmented buttons show the label up to " (".
-            new("Vanilla+ (by souperman9, default)", "5"), new("PsychoV-30 (as RenoDX's mods)", "4"), new("Vanilla (the game's own look)", "2"),
+            new("Vanilla+ (by souperman9, default)", "5"), new("PsychoV-30 (as RenoDX's mods)", "4"),
         };
 
-        /// <summary>hdr_gamut: the color volume PsychoV-30 fits the picture into (its gamut_compression_mode).</summary>
-        public static readonly Choice[] HdrGamut =
-        {
-            new("BT.2020 (default)", "bt2020"), new("BT.709", "bt709"),
-        };
 
         public static readonly Choice[] HdrBoost =
         {

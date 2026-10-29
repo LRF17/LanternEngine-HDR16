@@ -119,8 +119,8 @@ left as the game draws them: the HDR settings above replace them.
 
 ## Build from source
 
-This fork carries reproducible patches over Lantern 0.9.38: `ports/lantern/psychov30-engine.patch`
-on Lantern's `engine/` (the engine's full source since 0.9.37) and `psychov30-launcher.patch` on
+This fork carries reproducible patches over Lantern 0.9.38: `ports/lantern/nativeplus-engine.patch`
+on Lantern's `engine/` (the engine's full source since 0.9.37) and `nativeplus-launcher.patch` on
 its launcher (this fork's `launcher/` already holds it). The GitHub workflow copies the pinned
 Lantern's `engine/`, applies the patches, builds the engine and launcher, checks the HDR shaders
 (against RenoDX's own code for the color bridge) and assembles the package with the official

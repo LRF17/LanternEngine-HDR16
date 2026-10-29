@@ -2,7 +2,7 @@ using System;
 using System.IO;
 using BloodborneLauncher.Core;
 
-var root = Path.Combine(Path.GetTempPath(), "psychov30-paths-" + Guid.NewGuid());
+var root = Path.Combine(Path.GetTempPath(), "nativeplus-paths-" + Guid.NewGuid());
 try
 {
     foreach (var nested in new[] { false, true })

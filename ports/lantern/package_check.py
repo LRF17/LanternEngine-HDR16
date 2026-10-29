@@ -21,7 +21,7 @@ with tempfile.TemporaryDirectory() as data:
         raise RuntimeError('Packaged preparation entry point did not reach game detection')
 # The shipped settings (copied to lantern.ini by the launcher in a folder without settings).
 ini = (root / 'engine/lantern.default.ini').read_text()
-assert 'hdr_mode=psychov30' in ini and 'hdr_tonemapper=5' in ini
+assert 'hdr_mode=nativeplus' in ini and 'hdr_tonemapper=5' in ini
 assert not (root / 'bbport.ini').exists() and not (root / 'lantern.ini').exists()
 # Left to the display's peak (hdr_peak_auto) and the engine's paper white.
 assert not any(line.split('=', 1)[0] in ('hdr_peak', 'hdr_paper_white') for line in ini.splitlines())

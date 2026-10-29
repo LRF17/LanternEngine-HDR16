@@ -85,7 +85,7 @@ def assemble(engine, overlay, destination, cache):
     # launcher copies to lantern.ini when a folder has neither it nor an older bbport.ini), so no
     # player's existing settings are replaced.
     ini = runtime / 'lantern.default.ini'
-    defaults = dict(line.split('=', 1) for line in (overlay / 'hdr16-example.ini').read_text().splitlines())
+    defaults = dict(line.split('=', 1) for line in (overlay / 'nativeplus-example.ini').read_text().splitlines())
     defaults.pop('hdr')  # HDR output remains opt-in; Windows HDR must be enabled too.
     # Peak and paper white come from the display's peak unless the player sets them.
     unset = {'hdr_peak', 'hdr_paper_white'}
