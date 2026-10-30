@@ -1434,10 +1434,10 @@ index 0000000..5bbaf8f
 +#endif // BBPORT_BB_COMPOSITE_GLSL
 diff --git a/gpu/shadps4/video_core/host_shaders/hdr/bb_composite_hdr.frag b/gpu/shadps4/video_core/host_shaders/hdr/bb_composite_hdr.frag
 new file mode 100644
-index 0000000..977d225
+index 0000000..070f304
 --- /dev/null
 +++ b/gpu/shadps4/video_core/host_shaders/hdr/bb_composite_hdr.frag
-@@ -0,0 +1,465 @@
+@@ -0,0 +1,492 @@
 +// SPDX-FileCopyrightText: Copyright 2026 bbport
 +// SPDX-License-Identifier: GPL-2.0-or-later
 +//
@@ -1777,6 +1777,30 @@ index 0000000..977d225
 +    return bb_c_infinity_rolloff(rows, peak);
 +}
 +
++// RenoDX's hue correction (color/correct.hlsl, Hue in OKLab): the color's lightness and chroma,
++// the reference's hue.
++vec3 bb_correct_hue(vec3 c, vec3 reference) {
++    vec3 lab = bb_oklab(c);
++    vec2 ab = bb_oklab(reference).yz;
++    float chroma = length(lab.yz), reference_chroma = length(ab);
++    if (reference_chroma > 0.0) {
++        lab.yz = ab * (chroma / reference_chroma);
++    }
++    return bb_oklab_to_rgb(lab);
++}
++
++// PsychoV-30 V+ after the game's matrix (rows in RGB order), its hue Vanilla+'s: PsychoV30's
++// compression of each cone moves a bright orange towards yellow and a violet towards pink (as the
++// eye sees a strong light); the game's curve, per channel, keeps the artists' hues. Lightness,
++// chroma and peak stay PsychoV30's; the hue is Vanilla+'s output for the same pixel (its curve
++// and bloom, matrix, roll-off without the menu's grading, whose sliders are PsychoV30's here).
++vec3 bb_psychov_vplus_graded(BbComposite o, vec3 hdr_screen, vec3 vanilla_plus_screen) {
++    vec3 t = bb_psychov_vplus_rows(o, bb_grade(o, hdr_screen));
++    float peak = max(bb_bits(push_data.bb_hdr2a.x, BB_HDR_PEAK), 1.0);
++    t = bb_correct_hue(t, bb_c_infinity_rolloff(max(bb_grade(o, vanilla_plus_screen), 0.0), peak));
++    return (bb_choice(push_data.bb_hdr2b.z, 1) & 1) == 0 ? max(t, 0.0) : t;
++}
++
 +#ifndef BB_HW_INTERP
 +// The game's interpolation, as recompiled: attribute with the barycentrics.
 +vec2 interp(vec4 a0, vec4 a1, vec4 a2) {
@@ -1844,7 +1868,9 @@ index 0000000..977d225
 +    // Export order is rows 840, 844, 848; the game's target holds them as BGR (row 848 first,
 +    // see hdr/bb_tonemap.frag), hence .zyx before the luminance.
 +    vec3 sdr_graded = bb_grade(o, sdr_screen).zyx;
-+    vec3 hdr_graded = psychov_vplus  ? bb_psychov_vplus_rows(o, bb_grade(o, hdr_screen)).zyx
++    // PsychoV-30 V+'s hue reference: Vanilla+'s curve for the same pixel.
++    vec3 vplus_t = psychov_vplus ? bb_curve_vanilla_plus(o, x) : vec3(0.0);
++    vec3 hdr_graded = psychov_vplus  ? bb_psychov_vplus_graded(o, hdr_screen, max(vplus_t + g, 0.0)).zyx
 +                      : vanilla_plus ? bb_vanilla_plus_rows(bb_grade(o, hdr_screen)).zyx
 +                                     : bb_grade(o, hdr_screen).zyx;
 +    if (BB_OUTPUT_DELTA) {
@@ -1863,7 +1889,8 @@ index 0000000..977d225
 +                                : added_bloom ? max(hdr_t + g * k, 0.0)
 +                                              : hdr_t + glow_k * (1.0 - min(hdr_t, 1.0));
 +            target = !has_hdr      ? clamp(bb_grade(o, sdr_screen_k).zyx, 0.0, 1.0)
-+                     : psychov_vplus ? bb_psychov_vplus_rows(o, bb_grade(o, hdr_screen_k)).zyx
++                     : psychov_vplus ? bb_psychov_vplus_graded(o, hdr_screen_k,
++                                                               max(vplus_t + g * k, 0.0)).zyx
 +                     : vanilla_plus ? bb_vanilla_plus_rows(bb_grade(o, hdr_screen_k)).zyx
 +                                    : bb_grade(o, hdr_screen_k).zyx;
 +        }
@@ -8339,10 +8366,10 @@ index acec36c..fdad67a 100644
          std::vector<MirrorView> views;
          vk::Format format{};
 diff --git a/gpu/shim/bbport_overlay.cpp b/gpu/shim/bbport_overlay.cpp
-index 93b5634..a9c94c1 100644
+index 93b5634..45da94c 100644
 --- a/gpu/shim/bbport_overlay.cpp
 +++ b/gpu/shim/bbport_overlay.cpp
-@@ -405,6 +405,276 @@ const char* Item(const char* english, const char* russian = nullptr) {
+@@ -405,6 +405,277 @@ const char* Item(const char* english, const char* russian = nullptr) {
      return russian ? BbSettings::MenuText(english, russian) : BbSettings::MenuText(english);
  }
  
@@ -8496,12 +8523,13 @@ index 93b5634..a9c94c1 100644
 +        "highlights). PsychoV-30: RenoDX's tone mapper on the game's scene in place of its curve, "
 +        "as RenoDX's mods set it: the game's mid tones and contrast, PsychoV-30's own shadows, the "
 +        "lights up to your display's peak. PsychoV-30 V+ (test): PsychoV-30 with Vanilla+'s curve "
-+        "above mid grey and its bloom (brighter highlights, PsychoV-30's shadows). Live.",
++        "above mid grey, its bloom and its hues (brighter highlights, PsychoV-30's shadows). Live.",
 +        "Vanilla+ (автор souperman9, из его мода RenoDX для Bloodborne): картинка игры до среднего "
 +        "серого, свет выше продолжен и плавно доведён до пика дисплея (ярче блики). PsychoV-30: "
 +        "тонмаппер RenoDX вместо кривой игры, как в модах RenoDX: средние тона и контраст игры, "
 +        "собственные тени PsychoV-30, свет до пика вашего дисплея. PsychoV-30 V+ (тест): PsychoV-30 с "
-+        "кривой и свечением Vanilla+ выше среднего серого (ярче блики, тени PsychoV-30). Сразу."));
++        "кривой, свечением и оттенками Vanilla+ выше среднего серого (ярче блики, тени PsychoV-30). "
++        "Сразу."));
 +    const float display_peak = BbSettings::DisplayPeak();
 +    char peak_hint[200];
 +    if (display_peak > 0.0f) {
@@ -8619,7 +8647,7 @@ index 93b5634..a9c94c1 100644
  void HdrSection() {
      auto& s = BbSettings::Get();
      Section("HDR output", "Вывод HDR");
-@@ -439,22 +709,41 @@ void HdrSection() {
+@@ -439,22 +710,41 @@ void HdrSection() {
      }
      int mode = std::clamp(s.hdr_mode.load(), 0, BbSettings::HdrModeCount - 1);
      if (const char* label = Item("HDR mode", "Режим HDR")) {
@@ -8661,7 +8689,7 @@ index 93b5634..a9c94c1 100644
      if (const char* label = Item("Paper white (nits)", "Белый SDR (нит)")) {
          Slider(label, s.hdr_paper_white, BbSettings::HdrPaperWhiteMin, BbSettings::HdrPaperWhiteMax, "%.0f",
                 ImGuiSliderFlags_AlwaysClamp);
-@@ -499,19 +788,19 @@ void HdrSection() {
+@@ -499,19 +789,19 @@ void HdrSection() {
              "1 — весь (до пика). Меняются сразу. Ctrl+клик по ползунку — ввести точное значение."));
      }
      if (mode == BbSettings::HdrModeNative) {
@@ -8686,7 +8714,7 @@ index 93b5634..a9c94c1 100644
                  "1 — более насыщенные, как на мониторе с широким охватом в SDR (привычный вид; точный sRGB "
                  "рядом с ним может казаться блёклым). Меняются сразу."));
          }
-@@ -551,6 +840,9 @@ void PictureSection() {
+@@ -551,6 +841,9 @@ void PictureSection() {
              "0.25-8)."));
      }
      const bool vignette = s.graphics_vignette;
@@ -8696,7 +8724,7 @@ index 93b5634..a9c94c1 100644
      bool moved = false;
      const auto slider = [&](const char* english, const char* russian, std::atomic<float>& value, float lo,
                              float hi, const char* format = "%.2f") {
-@@ -558,12 +850,16 @@ void PictureSection() {
+@@ -558,12 +851,16 @@ void PictureSection() {
              moved |= Slider(label, value, lo, hi, format);
          }
      };
@@ -8717,7 +8745,7 @@ index 93b5634..a9c94c1 100644
      if (const char* label = Item("Vignette", "Виньетка")) {
          Checkbox(label, s.graphics_vignette);
          moved |= vignette != s.graphics_vignette;
-@@ -587,6 +883,17 @@ void PictureSection() {
+@@ -587,6 +884,17 @@ void PictureSection() {
          }
      }
      ImGui::EndDisabled();
@@ -8735,7 +8763,7 @@ index 93b5634..a9c94c1 100644
  }
  
  void EffectsSection() {
-@@ -1687,6 +1994,7 @@ void Menu() {
+@@ -1687,6 +1995,7 @@ void Menu() {
      bool restart =
          s.object_motion != s.startup_object_motion || s.model_lod != s.startup_model_lod ||
          s.live_resolution != s.startup_live_resolution || s.hdr != s.startup_hdr ||
@@ -8743,7 +8771,7 @@ index 93b5634..a9c94c1 100644
          BbSettings::ResolutionNeedsRestart();
      for (int e = 0; e < BbSettings::EffectCount; ++e) {
          restart |= s.effects[e] != s.startup_effects[e];
-@@ -2025,6 +2333,11 @@ bool HandleEvent(const SDL_Event& event) {
+@@ -2025,6 +2334,11 @@ bool HandleEvent(const SDL_Event& event) {
      case SDL_EVENT_KEY_DOWN:
      case SDL_EVENT_KEY_UP: {
          const bool down = event.type == SDL_EVENT_KEY_DOWN;
