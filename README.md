@@ -6,15 +6,16 @@ your display's peak, with an in-game menu laid out like a RenoDX mod. Two tone m
 
 - **Vanilla+** (default), by **souperman9**, from his RenoDX Bloodborne mod: the game's own image,
   with brighter highlights up to your display's peak.
-- **PsychoV-30**, RenoDX's tone mapper: softer highlights and its own shadows.
+- **PsychoV**: RenoDX's PsychoV-30 with Vanilla+'s highlights, bloom and hues: deeper blacks and
+  more detail near the peak.
 
 Native+ works with Lantern's upscalers and with frame generation (DLSS and FSR 3.1). Lantern's
 own README and credits are in [README-Lantern.md](README-Lantern.md).
 
 > **Unofficial, AI-assisted.** This is not a RenoDX mod and is not affiliated with or endorsed by
-> RenoDX or its authors. It reuses RenoDX's MIT-licensed code (PsychoV-30, its grading,
-> roll-off and gamut bridge) and souperman9's Vanilla+, but the HDR integration (where the scene
-> is captured, the game's color table, the output) is this port's own and does not follow
+> RenoDX or its authors. It reuses RenoDX's MIT-licensed code (PsychoV-30, its grading, hue
+> correction, roll-off and gamut bridge) and souperman9's Vanilla+, but the HDR integration
+> (where the scene is captured, the game's color table, the output) is this port's own and does not follow
 > RenoDX's mod guidelines. It was written largely with an AI coding assistant (Claude) and is
 > tested by a few players. Please do not report its issues to RenoDX or to souperman9. For RenoDX
 > itself, see [clshortfuse/renodx](https://github.com/clshortfuse/renodx).
@@ -78,12 +79,12 @@ Settings marked *Intermediate* or *Advanced* are shown from that Settings Mode o
 | Preset | Off, #1 to #3 (#1) | Off is the game's own look in HDR10, without HDR highlights. Each numbered preset keeps its own settings. |
 | Settings Mode | Simple, Intermediate, Advanced (Simple) | How many settings the menu shows. |
 | **Tone Mapping** | | |
-| Tone Mapper | Vanilla+, PsychoV-30 (Vanilla+) | See [Tone mappers](#tone-mappers). |
+| Tone Mapper | Vanilla+, PsychoV (Vanilla+) | See [Tone mappers](#tone-mappers). |
 | Peak Brightness | 400 to 4000 nits (your display's) | The brightest your display can show: the value Windows reports while not set by hand, 1000 if Windows reports none. The reset button goes back to the display's. |
 | Game Brightness | 80 to 500 nits (203) | The brightness of the game's white (the launcher's Paper white). |
 | UI Brightness | 48 to 500 nits (203) | The HUD and menus' white, whatever Game Brightness. |
 | **Color Grading** | | |
-| Exposure, Highlights, Shadows, Contrast, Saturation | 1.00, 50, 50, 50, 50 | Vanilla+: RenoDX's grading. PsychoV-30: its own parameters. Neutral at these values. |
+| Exposure, Highlights, Shadows, Contrast, Saturation | 1.00, 50, 50, 50, 50 | Vanilla+: RenoDX's grading. PsychoV: PsychoV-30's own parameters. Neutral at these values. |
 | Color Grade Strength *(Intermediate)* | 0 to 100 % (100) | The game's own color grading: 100 is the game's look, 0 the image before it. |
 | Black Floor *(Intermediate)* | 0 to 2 nits (0) | Takes the game's darkest greys down to true black (OLED). |
 | **Effects** | | |
@@ -114,19 +115,18 @@ replace them.
   off smoothly to your display's peak (RenoDX's `CInfinityRollOff`). The game's shadows, brighter
   mid-highlights than the game's and the brightest highlights; the very brightest lights turn
   white.
-- **PsychoV-30**: RenoDX's tone mapper, as RenoDX's mods set it: anchored where the game's curve
-  gives mid grey, with the game's contrast there, then a perceptual shoulder to your display's
-  peak. The game's mid tones, slightly deeper shadows, softer highlights that keep more detail and
-  color near the peak. Every color stays within BT.2020 and under the peak.
+- **PsychoV**: RenoDX's PsychoV-30 used as the FromSoftware Engine RenoDX mod uses its tone
+  mapper, on a game curve continued above mid grey. Below mid grey, PsychoV-30's own shadows
+  (anchored where the game's curve gives mid grey, with the game's contrast there). Above it,
+  Vanilla+'s curve, its bloom (added before the game's color matrix) and its hues (RenoDX's hue
+  correction), compressed to your display's peak by PsychoV-30. Every color stays within BT.2020
+  and under the peak.
 
-With PsychoV-30, the game's bloom is added as the game does (a screen blend), on the part of the
-image below the game's white; Vanilla+ adds it to the light before its roll-off. At the same
-settings, lanterns and flames are therefore brighter with Vanilla+ (about twice the nits at the
-game's white level), and PsychoV-30 keeps more of their gradation near the peak (the moon, a fire's
-core). That is the curves' own shape, not a setting: see [docs/TONEMAPPERS.md](docs/TONEMAPPERS.md).
-For brighter highlights with PsychoV-30, raise its **Highlights** (60 to 70): mid grey and shadows
-stay, the shoulder keeps several times Vanilla+'s detail near the peak, the brightest colors get
-paler.
+Against Vanilla+, PsychoV gives deeper blacks in most places, the same brightness for the
+brightest lights (the sun reaches the peak), mid-bright sources such as the moon and lamps about
+10 % lower, more gradation near the peak, and the same hues with softer colors near the peak (its
+**Saturation** raises them). How each step was chosen and measured, in the game and on RenoDX's
+own code: [docs/TONEMAPPERS.md](docs/TONEMAPPERS.md).
 
 Preset **Off** shows the game's own SDR look in HDR10, as a reference.
 
@@ -165,14 +165,14 @@ Preset **Off** shows the game's own SDR look in HDR10, as a reference.
   branch, releases from `lantern-Native+HDR`.
 - The launcher updates itself from this fork's releases.
 - **Updating from an earlier version**: your settings are kept. Settings that no longer exist
-  (Target gamut, Gamut Compression, Compression, Color Table Bridge) are ignored, the old tone
-  mappers (Vanilla, Hybrid, Neutwo) read as Vanilla+, and `hdr_mode=psychov30` reads as
-  `nativeplus`. A `bbport.ini` from before Lantern 0.9.37 is copied to `lantern.ini` once.
+  (Target gamut, Gamut Compression, Compression, Color Table Bridge) are ignored, PsychoV-30
+  reads as PsychoV (which replaced it), the old tone mappers (Vanilla, Hybrid, Neutwo) read as
+  Vanilla+, and `hdr_mode=psychov30` reads as `nativeplus`. A `bbport.ini` from before Lantern 0.9.37 is copied to `lantern.ini` once.
 
 ## How it works
 
 - **16-bit chain.** The game draws its final image in 8 bits, clipped at white. Native+ replaces
-  the game's final composite: the scene is tone mapped there (Vanilla+ or PsychoV-30), and every
+  the game's final composite: the scene is tone mapped there (Vanilla+ or PsychoV), and every
   pass after it (the color table, the upscaler, the display copy) runs in 16-bit float, so the
   light above white reaches the screen. The final pass converts to HDR10 (or scRGB with FSR frame
   generation).
@@ -199,7 +199,8 @@ the package with the official 0.9.38 runtime files (DLLs, models, shader catalog
   PsychoV-30).
 
 The GLSL PsychoV-30 is checked against RenoDX's HLSL, compiled unchanged, by
-`engine/docs/hdr-tools/psychov_check/run.sh` (in the engine patch), on the CPU.
+`engine/docs/hdr-tools/psychov_check/run.sh` (in the engine patch), on the CPU; the same script
+models PsychoV with that original (`psychov_model.cpp`).
 
 Native+'s replacements of the game's composite, color table and copies are built for each way the
 game shader can be compiled: inputs read per vertex (fragment-shader barycentrics, the
@@ -218,5 +219,6 @@ legacy compiler.
 - **Native+ HDR** by LRF17.
 - **Vanilla+** by **souperman9** (RenoDX Bloodborne mod).
 - **RenoDX** by Carlos Lopez (ShortFuse) and contributors, MIT (`licenses/RenoDX-MIT.txt`):
-  PsychoV-30, the user color grading, `CInfinityRollOff`, the gamut and LUT bridge, ported to GLSL.
+  PsychoV-30, the user color grading, the hue correction, `CInfinityRollOff`, the gamut and LUT
+  bridge, ported to GLSL.
 - No game data is included.
