@@ -26,8 +26,9 @@ namespace BloodborneLauncher.Core
         public const string Repository = "LRF17/LanternEngine-NativePlusHDR";
         public static string ReleasesPage => $"https://github.com/{Repository}/releases";
 
-        /// <summary>The engine build this launcher is made for (package.json "engine").</summary>
-        public const string EngineId = "lantern-fps95-nativeplus-v1";
+        /// <summary>The engine build this launcher is made for (package.json "engine"). A release whose
+        /// engine changed needs a new one: with the same, the updater replaces the launcher alone.</summary>
+        public const string EngineId = "lantern-fps95-nativeplus-v2";
 
         public const string ExeName = "Lantern Engine.exe";
         /// <summary>The launcher's name before 0.9.34 beta 8 (now a forwarder to ExeName).</summary>

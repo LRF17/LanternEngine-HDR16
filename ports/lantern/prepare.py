@@ -1,4 +1,4 @@
-"""Apply the separate HDR16 engine and launcher patches to a pinned Lantern checkout.
+"""Apply the separate Native+ HDR engine and launcher patches to a pinned Lantern checkout.
 
 Since 0.9.37, Lantern's repository holds the engine's full source in engine/: the engine patch
 applies to a copy of it, the launcher patch to the checkout itself (a check: the launcher is
@@ -32,5 +32,5 @@ def apply(root, patch):
     subprocess.run(['git', 'apply', '--whitespace=nowarn', str(patch)], cwd=root, check=True)
 
 
-apply(args.engine.resolve(), here / 'psychov30-engine.patch')
-apply(args.lantern.resolve(), here / 'psychov30-launcher.patch')
+apply(args.engine.resolve(), here / 'nativeplus-engine.patch')
+apply(args.lantern.resolve(), here / 'nativeplus-launcher.patch')
