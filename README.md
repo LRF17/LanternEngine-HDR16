@@ -161,7 +161,9 @@ Preset **Off** shows the game's own SDR look in HDR10, as a reference.
   with **Sub-pixel jitter** off (in-game menu, Upscaling), at the cost of some upscaling detail.
   It is being looked into.
 - **Color Grade Strength does nothing** in some places: the game draws no color grading there, or
-  a neutral one. The log says which ("Color table: ...").
+  a neutral one. The log says which: a "Color table" line each time the game's table changes (how
+  far it is from a neutral one), and one when the game stops drawing its grading for 3 s (also
+  during loading screens and menus). `BB_COLOR_TABLE_LOG=0` turns these lines off.
 
 ## Versions and updates
 

@@ -216,6 +216,11 @@ None was taken as better for reaching the peak more often.
   max difference 2e-4 of the color's largest channel over 9 configurations; no NaN or infinite
   value; the grey ramp monotonic and continuous. Then `psychov_model.cpp`: the tables above.
 - HDR captures in the game, Vanilla+ against PsychoV+ at each step (above).
+- The game's color table, read back from the GPU by the log line (0.9.38.3): a 16x16x16
+  `R32G32B32A32Sfloat` table that grades the image a little, mean change 4.6/255 against a neutral
+  table, largest 18/255, slightly warm (white 255, 251, 243; mid grey 137, 138, 134 for 136)
+  **[measured]**. The game stops drawing its grading pass at times (loading screens, menus, some
+  places); Color Grade Strength then has nothing to change.
 
 **Not run:** RenderDoc captures of each stage; the curve's parameters (832, 833) per place.
 
