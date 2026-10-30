@@ -250,7 +250,7 @@ namespace BloodborneLauncher.Views
                 Choices.HdrBoost, () => Ini.Get("hdr_boost", "0.25"), v => Ini.Set("hdr_boost", v));
             _hdrBoostRow = (FrameworkElement)Body.Children[Body.Children.Count - 1];
             ComboRow(SymbolRegular.Lightbulb24, L.T("Tone mapper"),
-                "Native+ only. Vanilla+ (by souperman9, from his RenoDX Bloodborne mod): the game's image up to mid grey, brighter highlights up to your display's peak. PsychoV: RenoDX's PsychoV-30 with Vanilla+'s bloom and hues; deeper blacks, softer highlights with the most detail near the peak. PsychoV+: PsychoV with Vanilla+'s curve above mid grey, Vanilla+'s brightness for the brightest lights. Also in the in-game menu, live",
+                "Native+ only. Vanilla+ (by souperman9, from his RenoDX Bloodborne mod): the game's image up to mid grey, brighter highlights up to your display's peak. PsychoV: RenoDX's PsychoV-30 with its own colors and Vanilla+'s bloom; deeper blacks, softer highlights with the most detail near the peak. PsychoV+: PsychoV with Vanilla+'s curve above mid grey and Vanilla+'s hues, Vanilla+'s brightness for the brightest lights. Also in the in-game menu, live",
                 Choices.HdrToneMapper, () => Choices.HdrToneMapperValue(Ini.Get("hdr_tonemapper", "5")), v => Ini.Set("hdr_tonemapper", v));
             _hdrToneMapperRow = (FrameworkElement)Body.Children[Body.Children.Count - 1];
             var hdrMore = Advanced();

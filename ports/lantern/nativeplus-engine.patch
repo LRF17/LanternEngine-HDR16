@@ -636,7 +636,7 @@ index 0000000..768c322
 +open(os.path.join(out, 'color', 'rgb.hlsl'), 'w').write(shim)
 diff --git a/docs/hdr-tools/psychov_check/psychov_model.cpp b/docs/hdr-tools/psychov_check/psychov_model.cpp
 new file mode 100644
-index 0000000..4054082
+index 0000000..5f354cc
 --- /dev/null
 +++ b/docs/hdr-tools/psychov_check/psychov_model.cpp
 @@ -0,0 +1,149 @@
@@ -651,9 +651,9 @@ index 0000000..4054082
 +//  PsychoV-30 alone: test30 on the scene, anchored at mid grey with the game's slope as its cone;
 +//    the bloom screen blended, clamped to 1.
 +//  PsychoV: the signal v = 0.18 (y / grey_in)^cone on the luminance y (PsychoV-30's greys); the
-+//    bloom added; test30 on the scene color of that signal; RenoDX's hue correction (OKLab) to
-+//    Vanilla+'s output.
-+//  PsychoV+: PsychoV with Vanilla+'s curve above grey_in (scaled to meet).
++//    bloom added; test30 on the scene color of that signal.
++//  PsychoV+: PsychoV with Vanilla+'s curve above grey_in (scaled to meet), then RenoDX's hue
++//    correction (OKLab) to Vanilla+'s output.
 +#include "spirv_cross/external_interface.h"
 +#define GLM_FORCE_SWIZZLE
 +#include <glm/glm.hpp>
@@ -738,7 +738,7 @@ index 0000000..4054082
 +    for (size_t i = 0; i < xs.size(); ++i) {
 +        V vp = per(per(glm::max(xs[i], V(6.1e-5)), vplus_f) + gs[i], cinf);
 +        V t30 = at(3 * i), glow = glm::clamp(gs[i], 0.0, 1.0);
-+        out.push_back({vp, t30 + glow * (V(1) - glm::min(t30, V(1))), correct_hue(at(3 * i + 1), vp),
++        out.push_back({vp, t30 + glow * (V(1) - glm::min(t30, V(1))), at(3 * i + 1),
 +                       correct_hue(at(3 * i + 2), vp)});
 +    }
 +    return out;
@@ -1593,10 +1593,10 @@ index 0000000..5bbaf8f
 +#endif // BBPORT_BB_COMPOSITE_GLSL
 diff --git a/gpu/shadps4/video_core/host_shaders/hdr/bb_composite_hdr.frag b/gpu/shadps4/video_core/host_shaders/hdr/bb_composite_hdr.frag
 new file mode 100644
-index 0000000..7f1da1a
+index 0000000..981e439
 --- /dev/null
 +++ b/gpu/shadps4/video_core/host_shaders/hdr/bb_composite_hdr.frag
-@@ -0,0 +1,496 @@
+@@ -0,0 +1,502 @@
 +// SPDX-FileCopyrightText: Copyright 2026 bbport
 +// SPDX-License-Identifier: GPL-2.0-or-later
 +//
@@ -1796,7 +1796,7 @@ index 0000000..7f1da1a
 +// the two meet). Both on the luminance, the color's ratios kept, then in Vanilla+'s order: the
 +// bloom added to v (no screen blend, whose per-channel clamp turned an orange glow yellow-green),
 +// the game's color matrix, then PsychoV30 on the scene color whose v that is
-+// (bb_psychov_vplus_rows), and Vanilla+'s hues (bb_psychov_vplus_graded).
++// (bb_psychov_vplus_rows); PsychoV+ then takes Vanilla+'s hues (bb_psychov_vplus_graded).
 +const vec3 BB_Y709 = vec3(0.2126390059, 0.7151686788, 0.0721923154);
 +
 +bool bb_curve_psychov_vplus(BbComposite o, vec3 x, bool extend, out vec3 v) {
@@ -1950,15 +1950,19 @@ index 0000000..7f1da1a
 +    return bb_oklab_to_rgb(lab);
 +}
 +
-+// PsychoV and PsychoV+ after the game's matrix (rows in RGB order), their hue Vanilla+'s: PsychoV30's
-+// compression of each cone moves a bright orange towards yellow and a violet towards pink (as the
-+// eye sees a strong light); the game's curve, per channel, keeps the artists' hues. Lightness,
-+// chroma and peak stay PsychoV30's; the hue is Vanilla+'s output for the same pixel (its curve
-+// and bloom, matrix, roll-off without the menu's grading, whose sliders are PsychoV30's here).
-+vec3 bb_psychov_vplus_graded(BbComposite o, vec3 hdr_screen, vec3 vanilla_plus_screen) {
++// PsychoV and PsychoV+ after the game's matrix (rows in RGB order). PsychoV+ takes Vanilla+'s hue
++// (`hue`): PsychoV30's compression of each cone moves a bright orange towards yellow and a violet
++// towards pink (as the eye sees a strong light); the game's curve, per channel, keeps the artists'
++// hues. Lightness, chroma and peak stay PsychoV30's; the hue is Vanilla+'s output for the same
++// pixel (its curve and bloom, matrix, roll-off without the menu's grading, whose sliders are
++// PsychoV30's here). PsychoV keeps PsychoV30's own hues (players found its yellower fires closer
++// to the game's SDR image).
++vec3 bb_psychov_vplus_graded(BbComposite o, vec3 hdr_screen, vec3 vanilla_plus_screen, bool hue) {
 +    vec3 t = bb_psychov_vplus_rows(o, bb_grade(o, hdr_screen));
-+    float peak = max(bb_bits(push_data.bb_hdr2a.x, BB_HDR_PEAK), 1.0);
-+    t = bb_correct_hue(t, bb_c_infinity_rolloff(max(bb_grade(o, vanilla_plus_screen), 0.0), peak));
++    if (hue) {
++        float peak = max(bb_bits(push_data.bb_hdr2a.x, BB_HDR_PEAK), 1.0);
++        t = bb_correct_hue(t, bb_c_infinity_rolloff(max(bb_grade(o, vanilla_plus_screen), 0.0), peak));
++    }
 +    return (bb_choice(push_data.bb_hdr2b.z, 1) & 1) == 0 ? max(t, 0.0) : t;
 +}
 +
@@ -2031,9 +2035,10 @@ index 0000000..7f1da1a
 +    // Export order is rows 840, 844, 848; the game's target holds them as BGR (row 848 first,
 +    // see hdr/bb_tonemap.frag), hence .zyx before the luminance.
 +    vec3 sdr_graded = bb_grade(o, sdr_screen).zyx;
-+    // PsychoV's and PsychoV+'s hue reference: Vanilla+'s curve for the same pixel.
-+    vec3 vplus_t = psychov_vplus ? bb_curve_vanilla_plus(o, x) : vec3(0.0);
-+    vec3 hdr_graded = psychov_vplus  ? bb_psychov_vplus_graded(o, hdr_screen, max(vplus_t + g, 0.0)).zyx
++    // PsychoV+'s hue reference: Vanilla+'s curve for the same pixel.
++    vec3 vplus_t = psychov_vplus && psychov_extend ? bb_curve_vanilla_plus(o, x) : vec3(0.0);
++    vec3 hdr_graded = psychov_vplus  ? bb_psychov_vplus_graded(o, hdr_screen, max(vplus_t + g, 0.0),
++                                                               psychov_extend).zyx
 +                      : vanilla_plus ? bb_vanilla_plus_rows(bb_grade(o, hdr_screen)).zyx
 +                                     : bb_grade(o, hdr_screen).zyx;
 +    if (BB_OUTPUT_DELTA) {
@@ -2053,7 +2058,8 @@ index 0000000..7f1da1a
 +                                              : hdr_t + glow_k * (1.0 - min(hdr_t, 1.0));
 +            target = !has_hdr      ? clamp(bb_grade(o, sdr_screen_k).zyx, 0.0, 1.0)
 +                     : psychov_vplus ? bb_psychov_vplus_graded(o, hdr_screen_k,
-+                                                               max(vplus_t + g * k, 0.0)).zyx
++                                                               max(vplus_t + g * k, 0.0),
++                                                               psychov_extend).zyx
 +                     : vanilla_plus ? bb_vanilla_plus_rows(bb_grade(o, hdr_screen_k)).zyx
 +                                    : bb_grade(o, hdr_screen_k).zyx;
 +        }
@@ -6999,7 +7005,7 @@ index e619502..c18d0ee 100644
  
  enum SchedulerType {
 diff --git a/gpu/shadps4/video_core/renderer_vulkan/vk_rasterizer.cpp b/gpu/shadps4/video_core/renderer_vulkan/vk_rasterizer.cpp
-index 265de16..15cd533 100644
+index 265de16..2a881cf 100644
 --- a/gpu/shadps4/video_core/renderer_vulkan/vk_rasterizer.cpp
 +++ b/gpu/shadps4/video_core/renderer_vulkan/vk_rasterizer.cpp
 @@ -1,3 +1,4 @@
@@ -7092,7 +7098,7 @@ index 265de16..15cd533 100644
 +        // mods pass them (0..100 sliders over 50: 1 neutral; exposure as it is); then the target
 +        // gamut (PsychoV30's gamut_compression_mode), 2 (no shadow match), 4 for Vanilla+ (its
 +        // own curve and roll-off; the sliders as RenoDX's user grading), 16 for PsychoV
-+        // (PsychoV30's curve, Vanilla+'s bloom and hues) or 8 for PsychoV+ (PsychoV with
++        // (PsychoV30's curve and hues, Vanilla+'s bloom) or 8 for PsychoV+ (PsychoV with
 +        // Vanilla+'s curve above mid grey) in one word, their sum + 1; then PsychoV30's
 +        // gamut_compression and compression in 1/10000 (bits 0..15, 16..30; bit 31 marks the
 +        // word as set).
@@ -7296,7 +7302,7 @@ index 265de16..15cd533 100644
      dynamic_state.SetColorWriteMasks(pipeline->GetGraphicsKey().write_masks);
      dynamic_state.SetAttachmentFeedbackLoopEnabled(attachment_feedback_loop);
  }
-@@ -5720,6 +5902,183 @@ void Rasterizer::ReportUboStats() {
+@@ -5720,6 +5902,193 @@ void Rasterizer::ReportUboStats() {
      frames = 0;
  }
  
@@ -7329,8 +7335,14 @@ index 265de16..15cd533 100644
 +
 +// The game's 16x16x16 color table (texel (r, g, b) at x + 16 (y + 16 z)) against a neutral one
 +// (texel = its coordinates / 15), in the table's own encoding, as 8-bit steps.
++u32 ColorTableTexelBytes(vk::Format format) {
++    return format == vk::Format::eR32G32B32A32Sfloat   ? 16
++           : format == vk::Format::eR16G16B16A16Sfloat ? 8
++                                                         : 4;
++}
++
 +void LogColorTable(const u8* data, vk::Format format, VAddr address, std::atomic<u64>& last) {
-+    const u32 texel_bytes = format == vk::Format::eR16G16B16A16Sfloat ? 8 : 4;
++    const u32 texel_bytes = ColorTableTexelBytes(format);
 +    const u64 hash = XXH3_64bits(data, 16 * 16 * 16 * texel_bytes);
 +    if (last.exchange(hash) == hash) {
 +        return;
@@ -7339,6 +7351,9 @@ index 265de16..15cd533 100644
 +        const u8* t = data + (x + 16 * (y + 16 * z)) * texel_bytes;
 +        std::array<float, 3> c{};
 +        switch (format) {
++        case vk::Format::eR32G32B32A32Sfloat:
++            std::memcpy(c.data(), t, sizeof(c));
++            break;
 +        case vk::Format::eR16G16B16A16Sfloat:
 +            for (u32 i = 0; i < 3; ++i) {
 +                c[i] = HalfToFloat(u16(t[2 * i] | (t[2 * i + 1] << 8)));
@@ -7445,7 +7460,8 @@ index 265de16..15cd533 100644
 +    const bool known = format == vk::Format::eR8G8B8A8Unorm || format == vk::Format::eR8G8B8A8Srgb ||
 +                       format == vk::Format::eB8G8R8A8Unorm || format == vk::Format::eB8G8R8A8Srgb ||
 +                       format == vk::Format::eA2B10G10R10UnormPack32 ||
-+                       format == vk::Format::eR16G16B16A16Sfloat;
++                       format == vk::Format::eR16G16B16A16Sfloat ||
++                       format == vk::Format::eR32G32B32A32Sfloat;
 +    if (info.size.width != 16 || info.size.height != 16 || info.size.depth != 16 || !known) {
 +        static bool told = false;
 +        if (!std::exchange(told, true)) {
@@ -7455,7 +7471,7 @@ index 265de16..15cd533 100644
 +        }
 +        return;
 +    }
-+    const u64 size = 16 * 16 * 16 * (format == vk::Format::eR16G16B16A16Sfloat ? 8 : 4);
++    const u64 size = 16 * 16 * 16 * ColorTableTexelBytes(format);
 +    const auto staging = runtime.GetStagingPool().Request(size, VideoCore::MemoryType::HostCached,
 +                                                          16, true);
 +    const vk::BufferImageCopy copy = {
@@ -8763,7 +8779,7 @@ index acec36c..fdad67a 100644
          std::vector<MirrorView> views;
          vk::Format format{};
 diff --git a/gpu/shim/bbport_overlay.cpp b/gpu/shim/bbport_overlay.cpp
-index 93b5634..431e2fd 100644
+index 93b5634..445266e 100644
 --- a/gpu/shim/bbport_overlay.cpp
 +++ b/gpu/shim/bbport_overlay.cpp
 @@ -405,6 +405,276 @@ const char* Item(const char* english, const char* russian = nullptr) {
@@ -8917,15 +8933,15 @@ index 93b5634..431e2fd 100644
 +    Hint(BbSettings::MenuText(
 +        "Vanilla+ (by souperman9, from his RenoDX Bloodborne mod): the game's own image up to mid "
 +        "grey, the lights continued above it and rolled off to your display's peak per color "
-+        "channel. PsychoV: RenoDX's PsychoV-30 on the game's scene, with Vanilla+'s bloom and hues "
-+        "(deeper blacks, softer highlights that keep the most detail and color near the peak). "
-+        "PsychoV+: PsychoV with Vanilla+'s curve above mid grey (Vanilla+'s brightness for the "
-+        "brightest lights). Live.",
++        "channel. PsychoV: RenoDX's PsychoV-30 on the game's scene, its own colors, with Vanilla+'s "
++        "bloom (deeper blacks, softer highlights that keep the most detail near the peak). "
++        "PsychoV+: PsychoV with Vanilla+'s curve above mid grey and Vanilla+'s hues (Vanilla+'s "
++        "brightness for the brightest lights). Live.",
 +        "Vanilla+ (автор souperman9, из его мода RenoDX для Bloodborne): картинка игры до среднего "
 +        "серого, свет выше продолжен и плавно доведён до пика дисплея по каждому каналу. PsychoV: "
-+        "PsychoV-30 из RenoDX на сцене игры, со свечением и оттенками Vanilla+ (глубже чёрный, "
-+        "мягче блики, больше деталей и цвета у пика). PsychoV+: PsychoV с кривой Vanilla+ выше "
-+        "среднего серого (яркость Vanilla+ для самого яркого света). Сразу."));
++        "PsychoV-30 из RenoDX на сцене игры, его собственные цвета, со свечением Vanilla+ (глубже "
++        "чёрный, мягче блики, больше деталей у пика). PsychoV+: PsychoV с кривой Vanilla+ выше "
++        "среднего серого и оттенками Vanilla+ (яркость Vanilla+ для самого яркого света). Сразу."));
 +    const float display_peak = BbSettings::DisplayPeak();
 +    char peak_hint[200];
 +    if (display_peak > 0.0f) {
@@ -9489,7 +9505,7 @@ index 1778aee..cc18e1c 100644
                                               [&](const auto& k) { return k.first == key; });
                  if (it != keys.end()) {
 diff --git a/gpu/shim/bbport_settings.h b/gpu/shim/bbport_settings.h
-index dd4ae62..5c9e1af 100644
+index dd4ae62..ec48e22 100644
 --- a/gpu/shim/bbport_settings.h
 +++ b/gpu/shim/bbport_settings.h
 @@ -5,6 +5,17 @@
@@ -9497,7 +9513,7 @@ index dd4ae62..5c9e1af 100644
  
  namespace BbSettings {
 +/// hdr_tonemapper: 5 Vanilla+ (the default; souperman9's, from his RenoDX Bloodborne mod),
-+/// 4 PsychoV (RenoDX's PsychoV-30 with its own curve; Vanilla+'s bloom and hues) or 7 PsychoV+
++/// 4 PsychoV (RenoDX's PsychoV-30 with its own curve and hues; Vanilla+'s bloom) or 7 PsychoV+
 +/// (PsychoV with Vanilla+'s curve above mid grey), all on the scene in the composite, BT.2020: the
 +/// final pass only encodes (HdrChannel::Tonemapper reports HdrToneMapperPsychoScene). Any other
 +/// value (6 was PsychoV-17) reads as Vanilla+. HdrToneMapperVanilla (the game's own look) is the
