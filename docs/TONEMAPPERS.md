@@ -59,9 +59,9 @@ brightness **[to measure]**.
 ## PsychoV and PsychoV+
 
 Both are RenoDX's **PsychoV-30** (`psychotm_test30`, ported to GLSL and checked against RenoDX's
-HLSL below), built in four steps, each from a difference seen in the game; PsychoV takes the
-first three, PsychoV+ all four with another first step. PsychoV (`hdr_tonemapper=4`) is
-PsychoV-30's own curve and colors; PsychoV+ (7, called
+HLSL below), built in four steps, each from a difference seen in the game; they differ in the
+first step and in the fourth's default. PsychoV (`hdr_tonemapper=4`) is PsychoV-30's own curve
+and colors; PsychoV+ (7, called
 PsychoV in 0.9.38.2) takes Vanilla+'s curve above mid grey, an idea taken from the FromSoftware
 Engine RenoDX mod's structure (a game curve continued above mid grey, then a PsychoV as the
 display mapping), not its operator.
@@ -82,14 +82,21 @@ display mapping), not its operator.
    luminance), anchored at `grey_in` with the game's slope as `cone_response_exponent`, as
    RenoDX's mods pass a vanilla slope **[RenoDX]**: its compression to the peak, purity, BT.2020
    target and gamut compression, and the menu's sliders as its own parameters.
-4. **Hue correction** (PsychoV+ only) to Vanilla+'s output for the same pixel (RenoDX's
-   `correct::Hue`, OKLab: PsychoV-30's lightness and chroma, Vanilla+'s hue, strength 1). PsychoV
-   keeps PsychoV-30's hues: players found its yellower fires closer to the game's SDR image.
+4. **Hue correction** to Vanilla+'s output for the same pixel, by the menu's **Hue Correction**
+   (`hdr_hue_correction`, 0 to 100 %; not set, the tone mapper's own: 0 % for PsychoV, 100 % for
+   PsychoV+). As RenoDX's `HueOKLab` (`colorcorrect.hlsl`): the (a, b) of PsychoV-30's color moved
+   towards the reference's by the strength, then scaled back to its chroma, so only the hue moves;
+   its final AP1 clamp is left out (the final pass's BT.2020 makes it moot). RenoDX's mods expose
+   the same as a Hue Correction slider (default 100 % in most, through RenoDRT); the Cyberpunk 2077
+   mod skips it for PsychoV, the FromSoftware Engine mod has its own hue emulation inside PsychoV.
    PsychoV-30 compresses each cone's
    response, so a bright orange (L far above M) moves towards yellow and a violet towards pink, as
    the eye sees a strong light; the game's curve, per channel, keeps the artists' hues. In the game
    the fires had turned yellow: OKLab hue 66 to 68 degrees between 100 and 400 nits, against
-   Vanilla+'s 55 to 59; with the correction 56 to 61 against 54 to 58 **[measured]**. The
+   Vanilla+'s 55 to 59; with the correction 56 to 61 against 54 to 58 **[measured]**. Against the
+   game's own SDR image of the same fire (59 degrees in the flame body), PsychoV gives 59 at 0 %
+   and 51 at 100 % **[measured]**: 0 % is the game's hue in the body, 100 % Vanilla+'s more orange
+   one. The
    reference is Vanilla+'s *final* color: its color before the roll-off made the brightest flames
    redder than Vanilla+ itself (46 degrees at x = 2 against 76) and the red channel passed the
    peak **[deduction]**.
@@ -189,8 +196,8 @@ Kept in PsychoV and PsychoV+, which call the same port:
 
 - **PsychoV-30 alone** (0.9.38.1's tone mapper, kept as PsychoV's curve and colors): its bloom
   clamped per channel (glows turned yellow-green). PsychoV is the same with the bloom fixed.
-- **Vanilla+'s hues in PsychoV** (as in PsychoV+, 0.9.38.3 before its release): fires orange,
-  but players found PsychoV-30's yellower fires closer to the game's SDR image.
+- **Vanilla+'s hues by default in PsychoV**: fires orange, but PsychoV-30's own hue is the
+  game's in the flame body (above); it is the Hue Correction slider's 100 % instead.
 - **PsychoV-17** (RenoDX's `psychotm_test17`, ported and checked within 7e-6, set as RenoDX's
   Starfield mod sets it): on greys PsychoV-30's curve exactly, its colors a little paler in the
   brightest saturated lights; the same as PsychoV-30 in the game. Removed before release.
@@ -209,8 +216,10 @@ None was taken as better for reaching the peak more often.
 
 ## Checks run
 
-- Engine build, settings tests (`hdr_tonemapper` 4 and 7 kept, 0, 2, 3 and 6 read as Vanilla+),
-  the host shader configurations compiled and validated (`shader_check.py`).
+- Engine build, settings tests (`hdr_tonemapper` 4 and 7 kept, 0, 2, 3 and 6 read as Vanilla+;
+  `hdr_hue_correction` not set by default, then 0 % for PsychoV and 100 % for PsychoV+, a value
+  set kept per preset, clamped to 0..100, below 0 back to not set), the host shader
+  configurations compiled and validated (`shader_check.py`).
 - `engine/docs/hdr-tools/psychov_check/run.sh`: the GLSL PsychoV-30 against RenoDX's HLSL compiled
   unchanged, on 791 colors (grey ramp 1e-4..1e4, 18 hues at 40 levels, out-of-gamut, extremes):
   max difference 2e-4 of the color's largest channel over 9 configurations; no NaN or infinite

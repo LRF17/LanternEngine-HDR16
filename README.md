@@ -86,6 +86,7 @@ Settings marked *Intermediate* or *Advanced* are shown from that Settings Mode o
 | UI Brightness | 48 to 500 nits (203) | The HUD and menus' white, whatever Game Brightness. |
 | **Color Grading** | | |
 | Exposure, Highlights, Shadows, Contrast, Saturation | 1.00, 50, 50, 50, 50 | Vanilla+: RenoDX's grading. PsychoV and PsychoV+: PsychoV-30's own parameters. Neutral at these values. |
+| Hue Correction *(PsychoV, PsychoV+)* | 0 to 100 % (0 for PsychoV, 100 for PsychoV+) | How far the colors take Vanilla+'s hues (RenoDX's hue correction): 0 keeps PsychoV-30's own, with brighter fires more yellow; 100 Vanilla+'s, more orange. Brightness and saturation unchanged. |
 | Color Grade Strength *(Intermediate)* | 0 to 100 % (100) | The game's own color grading: 100 is the game's look, 0 the image before it. |
 | Black Floor *(Intermediate)* | 0 to 2 nits (0) | Takes the game's darkest greys down to true black (OLED). |
 | **Effects** | | |
@@ -120,11 +121,15 @@ replace them.
   grey, with the game's contrast there, then a perceptual shoulder to your display's peak. The
   game's bloom is added before the compression, so an orange glow stays orange. Deeper shadows
   than the game's, softer highlights that keep the most gradation near the peak; very bright
-  fires turn a little yellower, as PsychoV-30 renders a strong light.
+  fires turn a little yellower, as PsychoV-30 renders a strong light (Hue Correction at 0 %).
 - **PsychoV+**: PsychoV with Vanilla+'s curve above mid grey, compressed by PsychoV-30, and
-  Vanilla+'s hues (RenoDX's hue correction: fires stay orange): PsychoV's shadows, Vanilla+'s
+  Vanilla+'s hues (Hue Correction at 100 %: fires stay orange): PsychoV's shadows, Vanilla+'s
   brightness for the brightest lights (the sun reaches the peak), the moon and lamps about 10 %
   below Vanilla+.
+
+Both have a **Hue Correction** slider (Color Grading) from PsychoV-30's own hues (0 %) to
+Vanilla+'s (100 %), RenoDX's hue correction: only the hue moves, not the brightness or the
+saturation.
 
 Every color stays within BT.2020 and under the peak with both PsychoV. Their colors are softer
 than Vanilla+'s near the peak (their **Saturation** raises them). How each was built and
