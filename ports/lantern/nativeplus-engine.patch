@@ -9161,6 +9161,21 @@ index 616a24f..d1b69e4 100644
      const float hue = std::clamp(std::isfinite(s.graphics_hue.load()) ? s.graphics_hue.load() : 0.0f, -180.0f, 180.0f);
      const bool vignette = s.graphics_vignette.load(std::memory_order_relaxed);
      Tune(block + kGlare, on && bloom != 1, [bloom](float v) { return v * bloom; });
+diff --git a/gpu/shim/window.cpp b/gpu/shim/window.cpp
+index 5c854f7..0cfce7a 100644
+--- a/gpu/shim/window.cpp
++++ b/gpu/shim/window.cpp
+@@ -125,6 +125,10 @@ u32 DisplayRefreshHz() {
+ 
+ WindowSDL::WindowSDL(s32 width_, s32 height_, const char* title) : width{width_}, height{height_} {
+     SDL_SetHint(SDL_HINT_VIDEO_WAYLAND_SCALE_TO_DISPLAY, "1");
++    // DirectInput's device scan, run on every plug or unplug, waits on each HID device; one that
++    // stops answering froze this thread and the game (dinput8 -> hid.dll). XInput and HIDAPI pads
++    // don't need it; SDL_JOYSTICK_DIRECTINPUT=1 in the environment brings it back.
++    SDL_SetHint(SDL_HINT_JOYSTICK_DIRECTINPUT, "0");
+     if (!SDL_InitSubSystem(SDL_INIT_VIDEO | SDL_INIT_GAMEPAD)) {
+         UNREACHABLE_MSG("Failed to initialize SDL video: {}", SDL_GetError());
+     }
 diff --git a/scripts/run_windows.py b/scripts/run_windows.py
 index e4359f2..1424ea4 100644
 --- a/scripts/run_windows.py
@@ -9192,6 +9207,22 @@ index e4359f2..1424ea4 100644
          command = [probe, out / 'boot-linked.bin', '--content-profile', out / 'content.bin',
                     '--patches', out / 'patches.bin', '--app0', merged,
                     '--user', os.environ.get('BB_USER_DIR', data / 'user'),
+diff --git a/src/runtime_pad.c b/src/runtime_pad.c
+index 3b26aff..e13b448 100644
+--- a/src/runtime_pad.c
++++ b/src/runtime_pad.c
+@@ -126,7 +126,10 @@ static SDL_Gamepad *current_gamepad(void) {
+     static int on_preferred; static uint64_t last_scan;
+     if (!sdl_ready) sdl_ready = SDL_WasInit(SDL_INIT_GAMEPAD) ? 1 : SDL_InitSubSystem(SDL_INIT_GAMEPAD) ? 1 : -1;
+     if (sdl_ready<0) return NULL;
+-    if (gamepad && !SDL_GamepadConnected(gamepad)) { SDL_CloseGamepad(gamepad); gamepad=NULL; }
++    if (gamepad && !SDL_GamepadConnected(gamepad)) {
++        printf("Runtime: gamepad disconnected: %s\n",SDL_GetGamepadName(gamepad));
++        SDL_CloseGamepad(gamepad); gamepad=NULL;
++    }
+     const char *want=preferred_gamepad();
+     const uint64_t now=now_us();
+     if (!gamepad || (want && !on_preferred && now-last_scan>1000000)) {
 diff --git a/tests/test_settings.cpp b/tests/test_settings.cpp
 index b9d9eef..e961e53 100644
 --- a/tests/test_settings.cpp
