@@ -110,12 +110,23 @@ replace them.
 ## Tone mappers
 
 - **Vanilla+** (default), by **souperman9**, from his RenoDX Bloodborne mod: the game's own curve
-  up to mid grey, continued in a straight line above it, the bloom added, then rolled off smoothly
-  to your display's peak (RenoDX's `CInfinityRollOff`). The game's shadows and mid tones, the
-  brightest highlights.
-- **PsychoV-30**: RenoDX's tone mapper, as RenoDX's mods set it: the game's mid grey and contrast,
-  its own shadows, softer highlights than Vanilla+. Colors outside BT.709 are kept to the end and
-  shown in BT.2020.
+  up to a scene value of 0.18, continued in a straight line above it, the bloom added, then rolled
+  off smoothly to your display's peak (RenoDX's `CInfinityRollOff`). The game's shadows, brighter
+  mid-highlights than the game's and the brightest highlights; the very brightest lights turn
+  white.
+- **PsychoV-30**: RenoDX's tone mapper, as RenoDX's mods set it: anchored where the game's curve
+  gives mid grey, with the game's contrast there, then a perceptual shoulder to your display's
+  peak. The game's mid tones, slightly deeper shadows, softer highlights that keep more detail and
+  color near the peak. Every color stays within BT.2020 and under the peak.
+
+With PsychoV-30, the game's bloom is added as the game does (a screen blend), on the part of the
+image below the game's white; Vanilla+ adds it to the light before its roll-off. At the same
+settings, lanterns and flames are therefore brighter with Vanilla+ (about twice the nits at the
+game's white level), and PsychoV-30 keeps more of their gradation near the peak (the moon, a fire's
+core). That is the curves' own shape, not a setting: see [docs/TONEMAPPERS.md](docs/TONEMAPPERS.md).
+For brighter highlights with PsychoV-30, raise its **Highlights** (60 to 70): mid grey and shadows
+stay, the shoulder keeps several times Vanilla+'s detail near the peak, the brightest colors get
+paler.
 
 Preset **Off** shows the game's own SDR look in HDR10, as a reference.
 
@@ -184,7 +195,11 @@ launcher, checks the HDR shaders (against RenoDX's own code for the gamut bridge
 the package with the official 0.9.38 runtime files (DLLs, models, shader catalogs). Pinned inputs:
 
 - LanternEngine `4715bca355059b7bd981ca849412884059d4d0a7` (0.9.38).
-- RenoDX `b6b32f47789ff9d0e640a0e0db6c9421b5397f34` (shader checks).
+- RenoDX `b6b32f47789ff9d0e640a0e0db6c9421b5397f34` (shader checks, and the source of the GLSL
+  PsychoV-30).
+
+The GLSL PsychoV-30 is checked against RenoDX's HLSL, compiled unchanged, by
+`engine/docs/hdr-tools/psychov_check/run.sh` (in the engine patch), on the CPU.
 
 Native+'s replacements of the game's composite, color table and copies are built for each way the
 game shader can be compiled: inputs read per vertex (fragment-shader barycentrics, the
