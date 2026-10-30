@@ -265,6 +265,10 @@ namespace BloodborneLauncher.Core
         /// <summary>SDL3 hints for controllers, given to the game and used by the launcher's own SDL (SdlPad).</summary>
         public static IEnumerable<(string Key, string Value)> SdlHints()
         {
+            // DirectInput's device scan waits on each HID device: one that stops answering held the
+            // Controls page (SdlPad starts SDL on the UI thread) for 30 s. XInput and HIDAPI pads
+            // don't need it; the engine turns it off too (window.cpp).
+            yield return ("SDL_JOYSTICK_DIRECTINPUT", "0");
             yield return ("SDL_JOYSTICK_HIDAPI_PS3", "1");
             yield return ("SDL_JOYSTICK_HIDAPI_PS3_SIXAXIS_DRIVER", "1");
             var mappings = Path.Combine(Paths.EngineDir, "gamecontrollerdb.txt");
