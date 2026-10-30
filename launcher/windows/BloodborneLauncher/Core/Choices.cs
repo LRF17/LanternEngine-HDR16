@@ -239,16 +239,18 @@ namespace BloodborneLauncher.Core
         {
             new(L.T("Native"), "native"), new(L.T("Expanded"), "expand"),
             new("Native+ (restart)", "nativeplus",
-                "Native+ HDR by LRF17 (github.com/LRF17/LanternEngine-NativePlusHDR). Tone mappers: Vanilla+ by souperman9 (from his RenoDX Bloodborne mod); PsychoV-30 from RenoDX (© 2026 Carlos Lopez, MIT License, github.com/clshortfuse/renodx)."),
+                "Native+ HDR by LRF17 (github.com/LRF17/LanternEngine-NativePlusHDR). Tone mappers: Vanilla+ by souperman9 (from his RenoDX Bloodborne mod); PsychoV built on PsychoV-30 and the hue correction from RenoDX (© 2026 Carlos Lopez, MIT License, github.com/clshortfuse/renodx)."),
         };
 
-        /// <summary>hdr_tonemapper with Native+ (hdr_mode=nativeplus): 5 Vanilla+ (souperman9's, from his RenoDX Bloodborne mod; the default), 4 PsychoV-30 (as RenoDX's mods) or 7 PsychoV-30 with Vanilla+'s curve above mid grey (test).</summary>
+        /// <summary>hdr_tonemapper with Native+ (hdr_mode=nativeplus): 5 Vanilla+ (souperman9's, from his RenoDX Bloodborne mod; the default) or 7 PsychoV (RenoDX's PsychoV-30 with Vanilla+'s curve above mid grey, its bloom and hues). 4, PsychoV-30 alone before PsychoV replaced it, shows as PsychoV (HdrToneMapperValue).</summary>
         public static readonly Choice[] HdrToneMapper =
         {
             // The segmented buttons show the label up to " (".
-            new("Vanilla+ (by souperman9, default)", "5"), new("PsychoV-30 (as RenoDX's mods)", "4"),
-            new("PsychoV-30 V+ (test: Vanilla+'s curve above mid grey)", "7"),
+            new("Vanilla+ (by souperman9, default)", "5"), new("PsychoV (PsychoV-30 on Vanilla+'s curve)", "7"),
         };
+
+        /// <summary>The stored hdr_tonemapper as a HdrToneMapper choice, as the engine reads it: 4 and 7 PsychoV, anything else Vanilla+.</summary>
+        public static string HdrToneMapperValue(string stored) => stored == "4" || stored == "7" ? "7" : "5";
 
 
         public static readonly Choice[] HdrBoost =

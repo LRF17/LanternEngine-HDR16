@@ -203,7 +203,7 @@ namespace BloodborneLauncher.Views
                     : L.T("This display shows no HDR");
             IniToggle(SymbolRegular.Hdr24, L.T("HDR output"), hdrHint, "hdr");
             ComboRow(SymbolRegular.Lightbulb24, L.T("HDR source"),
-                "Native+: the light of the game's scene kept to the screen, tone mapped to your display's peak by Vanilla+ or PsychoV-30. Native: highlights derived from the game's HDR scene. Expanded: bright SDR pixels expanded towards the peak. Entering or leaving Native+ requires restarting the game.",
+                "Native+: the light of the game's scene kept to the screen, tone mapped to your display's peak by Vanilla+ or PsychoV. Native: highlights derived from the game's HDR scene. Expanded: bright SDR pixels expanded towards the peak. Entering or leaving Native+ requires restarting the game.",
                 Choices.HdrMode, HdrMode, v => Ini.Set("hdr_mode", v), changed: RefreshHdrRows);
             // Defaults, as the engine's: paper white 203 (BT.2408's reference white); the peak from
             // the display (hdr_peak_auto) unless it is set.
@@ -250,8 +250,8 @@ namespace BloodborneLauncher.Views
                 Choices.HdrBoost, () => Ini.Get("hdr_boost", "0.25"), v => Ini.Set("hdr_boost", v));
             _hdrBoostRow = (FrameworkElement)Body.Children[Body.Children.Count - 1];
             ComboRow(SymbolRegular.Lightbulb24, L.T("Tone mapper"),
-                "Native+ only. Vanilla+ (by souperman9, from his RenoDX Bloodborne mod): the game's image up to mid grey, brighter highlights up to your display's peak. PsychoV-30: as RenoDX's mods, its own shadows. PsychoV-30 V+ (test): PsychoV-30 with Vanilla+'s curve above mid grey, its bloom and its hues, brighter highlights. Also in the in-game menu, live",
-                Choices.HdrToneMapper, () => Ini.Get("hdr_tonemapper", "5"), v => Ini.Set("hdr_tonemapper", v));
+                "Native+ only. Vanilla+ (by souperman9, from his RenoDX Bloodborne mod): the game's image up to mid grey, brighter highlights up to your display's peak. PsychoV: RenoDX's PsychoV-30 with its shadows, Vanilla+'s curve, bloom and hues above mid grey; deeper blacks, more detail at the top. Also in the in-game menu, live",
+                Choices.HdrToneMapper, () => Choices.HdrToneMapperValue(Ini.Get("hdr_tonemapper", "5")), v => Ini.Set("hdr_tonemapper", v));
             _hdrToneMapperRow = (FrameworkElement)Body.Children[Body.Children.Count - 1];
             var hdrMore = Advanced();
             ComboRow(SymbolRegular.Color24, L.T("UI colour"), L.T("Native source only: Vivid shows the HUD and menus with the colours a wide-gamut monitor gives SDR; Exact keeps sRGB's"),
