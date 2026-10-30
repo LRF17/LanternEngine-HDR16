@@ -749,10 +749,10 @@ index 9221006..f5ec50c 100644
          public static readonly string ConfigFile = Path.Combine(ConfigDir, "settings.json");
  
 diff --git a/launcher/windows/BloodborneLauncher/Core/Updater.cs b/launcher/windows/BloodborneLauncher/Core/Updater.cs
-index ca74199..326ff81 100644
+index ca74199..36a4232 100644
 --- a/launcher/windows/BloodborneLauncher/Core/Updater.cs
 +++ b/launcher/windows/BloodborneLauncher/Core/Updater.cs
-@@ -1,510 +1,521 @@
+@@ -1,510 +1,522 @@
 -﻿using System.Diagnostics;
 -using System.IO;
 -using System.IO.Compression;
@@ -1291,8 +1291,9 @@ index ca74199..326ff81 100644
 +        public const string Repository = "LRF17/LanternEngine-NativePlusHDR";
 +        public static string ReleasesPage => $"https://github.com/{Repository}/releases";
 +
-+        /// <summary>The engine build this launcher is made for (package.json "engine").</summary>
-+        public const string EngineId = "lantern-fps95-nativeplus-v1";
++        /// <summary>The engine build this launcher is made for (package.json "engine"). A release whose
++        /// engine changed needs a new one: with the same, the updater replaces the launcher alone.</summary>
++        public const string EngineId = "lantern-fps95-nativeplus-v2";
 +
 +        public const string ExeName = "Lantern Engine.exe";
 +        /// <summary>The launcher's name before 0.9.34 beta 8 (now a forwarder to ExeName).</summary>
