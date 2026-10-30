@@ -636,24 +636,23 @@ index 0000000..768c322
 +open(os.path.join(out, 'color', 'rgb.hlsl'), 'w').write(shim)
 diff --git a/docs/hdr-tools/psychov_check/psychov_model.cpp b/docs/hdr-tools/psychov_check/psychov_model.cpp
 new file mode 100644
-index 0000000..5f354cc
+index 0000000..95ecae4
 --- /dev/null
 +++ b/docs/hdr-tools/psychov_check/psychov_model.cpp
-@@ -0,0 +1,149 @@
-+// The tone mappers PsychoV (+ 16) and PsychoV+ (+ 8) of host_shaders/hdr/bb_composite_hdr.frag
-+// modelled on the CPU with RenoDX's own test30 (orig30, from run.sh), against Vanilla+ and
-+// PsychoV-30 alone (its scene path with the game's screen-blended bloom). Interiors (the game's
-+// curve k 2.30, c 0.46: mid grey at a scene 0.19475, log-log slope 1.1656 there), peak 1000 nits,
-+// white 203; the game's color matrix left out (identity). LanternEngine-NativePlusHDR's
+@@ -0,0 +1,176 @@
++// The tone mapper PsychoV of host_shaders/hdr/bb_composite_hdr.frag (+ 16) modelled on the CPU
++// with RenoDX's own test30 (orig30, from run.sh), against Vanilla+ and PsychoV-30 alone (0.9.38.1's
++// tone mapper: its scene path with the game's screen-blended bloom). Interiors (the game's curve
++// k 2.30, c 0.46: mid grey at a scene 0.19475, log-log slope 1.1656 there), peak 1000 nits, white
++// 203; the game's color matrix left out (identity). LanternEngine-NativePlusHDR's
 +// docs/TONEMAPPERS.md quotes these tables.
 +//  Vanilla+: the game's curve below 0.18, its tangent above, per channel; the bloom added;
 +//    CInfinityRollOff (0.18, 1.5) per channel to the peak.
 +//  PsychoV-30 alone: test30 on the scene, anchored at mid grey with the game's slope as its cone;
 +//    the bloom screen blended, clamped to 1.
-+//  PsychoV: the signal v = 0.18 (y / grey_in)^cone on the luminance y (PsychoV-30's greys); the
-+//    bloom added; test30 on the scene color of that signal.
-+//  PsychoV+: PsychoV with Vanilla+'s curve above grey_in (scaled to meet), then RenoDX's hue
-+//    correction (OKLab) to Vanilla+'s output.
++//  PsychoV: the signal (signal()), the bloom added, test30 on the scene color of that signal, then
++//    RenoDX's hue correction (OKLab) to Vanilla+'s output by the menu's Hue Correction. Vanilla+
++//    Highlights 100 % with Hue Correction 100 % is 0.9.38.2's PsychoV.
 +#include "spirv_cross/external_interface.h"
 +#define GLM_FORCE_SWIZZLE
 +#include <glm/glm.hpp>
@@ -686,7 +685,15 @@ index 0000000..5f354cc
 +}
 +double cinf(double x) { double d = std::max(x - 0.18, 0.0); if (d <= 0) return x; double r = P - 0.18, ip = r / (1.5 * d); return r / (1.5 * ip + std::exp2(-ip)) + x - d; }
 +V per(V c, double (*f)(double)) { return {f(c.x), f(c.y), f(c.z)}; }
-+double signal(double y) { return y < GI ? 0.18 * std::pow(y / GI, GS) : vplus_f(y) * 0.18 / vplus_f(GI); }
++// PsychoV's signal on the luminance y: PsychoV-30's v = 0.18 (y / grey_in)^cone below grey_in;
++// above it, that v and Vanilla+'s extended curve (scaled to meet at grey_in) mixed in the log by
++// the menu's Vanilla+ Highlights `t` (0..1).
++double signal(double y, double t) {
++    const double v = 0.18 * std::pow(y / GI, GS);
++    if (y < GI || t <= 0) return v;
++    const double vp = vplus_f(y) * 0.18 / vplus_f(GI);
++    return std::exp((1 - t) * std::log(v) + t * std::log(vp));
++}
 +V to2020(V c) { return {0.6274039*c.x+0.3292830*c.y+0.0433131*c.z, 0.0690973*c.x+0.9195404*c.y+0.0113623*c.z, 0.0163914*c.x+0.0880133*c.y+0.8955953*c.z}; }
 +double nits(V c) { V b = to2020(c); return (0.2627002*b.x+0.6779981*b.y+0.0593017*b.z) * N; }
 +double top(V c) { V b = to2020(c); return std::max(b.x, std::max(b.y, b.z)) * N; }
@@ -702,10 +709,15 @@ index 0000000..5f354cc
 +}
 +double hue(V c) { V l = oklab(c); double h = std::atan2(l.z, l.y) * 57.2957795; return h < 0 ? h + 360 : h; }
 +double chroma(V c) { V l = oklab(c); return std::hypot(l.y, l.z) / std::max(l.x, 1e-9); }
-+V correct_hue(V c, V reference) {
++// RenoDX's HueOKLab: (a, b) moved towards the reference's by `strength`, then the color's chroma.
++V correct_hue(V c, V reference, double strength) {
++    if (strength <= 0) return c;
 +    V a = oklab(c), b = oklab(reference);
-+    double ca = std::hypot(a.y, a.z), cb = std::hypot(b.y, b.z);
-+    if (cb > 0) { a.y = b.y * ca / cb; a.z = b.z * ca / cb; }
++    const double ca = std::hypot(a.y, a.z);
++    a.y += (b.y - a.y) * strength;
++    a.z += (b.z - a.z) * strength;
++    const double cb = std::hypot(a.y, a.z);
++    if (cb > 0) { a.y *= ca / cb; a.z *= ca / cb; }
 +    return from_oklab(a);
 +}
 +// test30 as the composite calls it: BT.2020, BT.709 source boundary, the menu's sliders neutral,
@@ -716,59 +728,73 @@ index 0000000..5f354cc
 +    p.adaptive = (float)GI;
 +    return p;
 +}
-+// The four tone mappers on scene colors x with the bloom g (the game's units, after its curve):
-+// PsychoV takes PsychoV-30's signal throughout, PsychoV+ Vanilla+'s above grey_in.
-+struct Out { V vplus, v30, psychov, plus; };
-+std::vector<Out> map(const std::vector<V>& xs, const std::vector<V>& gs) {
++V vanilla_plus(V x, V g) { return per(per(glm::max(x, V(6.1e-5)), vplus_f) + g, cinf); }
++// PsychoV-30 alone (0.9.38.1): test30 on the scene, the bloom screen blended, clamped to 1.
++std::vector<V> v30(const std::vector<V>& xs, const std::vector<V>& gs) {
++    Batch in;
++    for (auto& x : xs) { V c = glm::max(x, V(6.1e-5)); in.push_back({(float)c.x, (float)c.y, (float)c.z, 1}); }
++    Batch r = run(now(), in);
++    std::vector<V> out;
++    for (size_t i = 0; i < xs.size(); ++i) {
++        V t(r[i].x, r[i].y, r[i].z), glow = glm::clamp(gs[i], 0.0, 1.0);
++        out.push_back(t + glow * (V(1) - glm::min(t, V(1))));
++    }
++    return out;
++}
++// PsychoV with Vanilla+ Highlights `t` and Hue Correction `h` (0..1).
++std::vector<V> psychov(const std::vector<V>& xs, const std::vector<V>& gs, double t, double h) {
 +    Batch in;
 +    for (size_t i = 0; i < xs.size(); ++i) {
 +        V x = glm::max(xs[i], V(6.1e-5));
-+        in.push_back({(float)x.x, (float)x.y, (float)x.z, 1});
 +        double y = glm::dot(x, Y709);
-+        for (bool extend : {false, true}) {
-+            V s = x * ((extend ? signal(y) : 0.18 * std::pow(y / GI, GS)) / y) + gs[i];
-+            double ys = glm::dot(s, Y709);
-+            V eq = s * (GI * std::pow(ys / 0.18, 1 / GS) / ys);
-+            in.push_back({(float)eq.x, (float)eq.y, (float)eq.z, 1});
-+        }
++        V s = x * (signal(y, t) / y) + gs[i];
++        double ys = glm::dot(s, Y709);
++        V eq = s * (GI * std::pow(ys / 0.18, 1 / GS) / ys);
++        in.push_back({(float)eq.x, (float)eq.y, (float)eq.z, 1});
 +    }
 +    Batch r = run(now(), in);
-+    std::vector<Out> out;
-+    const auto at = [&](size_t k) { return V(r[k].x, r[k].y, r[k].z); };
-+    for (size_t i = 0; i < xs.size(); ++i) {
-+        V vp = per(per(glm::max(xs[i], V(6.1e-5)), vplus_f) + gs[i], cinf);
-+        V t30 = at(3 * i), glow = glm::clamp(gs[i], 0.0, 1.0);
-+        out.push_back({vp, t30 + glow * (V(1) - glm::min(t30, V(1))), at(3 * i + 1),
-+                       correct_hue(at(3 * i + 2), vp)});
-+    }
++    std::vector<V> out;
++    for (size_t i = 0; i < xs.size(); ++i)
++        out.push_back(correct_hue(V(r[i].x, r[i].y, r[i].z), vanilla_plus(xs[i], gs[i]), h));
 +    return out;
 +}
 +int main() {
 +    const double xs[] = {0.002, 0.01, 0.05, 0.1, 0.18, 0.3, 0.5, 1, 2, 4, 8, 16, 32, 64};
 +    std::vector<V> g, none;
 +    for (double x : xs) { g.push_back(V(x)); none.push_back(V(0)); }
-+    auto o = map(g, none);
-+    printf("== Grey (nits)\n  %6s | %9s | %10s | %9s | %9s\n", "scene", "Vanilla+", "PsychoV-30", "PsychoV", "PsychoV+");
-+    for (size_t i = 0; i < g.size(); ++i)
-+        printf("  %6.3f | %9.2f | %10.2f | %9.2f | %9.2f\n", xs[i], nits(o[i].vplus), nits(o[i].v30),
-+               nits(o[i].psychov), nits(o[i].plus));
++    const double ts[] = {0, 0.25, 0.5, 0.75, 1};
++    std::vector<V> pv[5];
++    for (int k = 0; k < 5; ++k) pv[k] = psychov(g, none, ts[k], 0);
++    auto a30 = v30(g, none);
++    printf("== Grey (nits): Vanilla+, PsychoV-30 alone, PsychoV at Vanilla+ Highlights 0 / 25 / 50 / 75 / 100 %%\n");
++    printf("  %6s | %9s | %10s | %8s | %8s | %8s | %8s | %8s\n", "scene", "Vanilla+", "PsychoV-30", "VH 0", "VH 25",
++           "VH 50", "VH 75", "VH 100");
++    for (size_t i = 0; i < g.size(); ++i) {
++        printf("  %6.3f | %9.2f | %10.2f", xs[i], nits(vanilla_plus(g[i], V(0))), nits(a30[i]));
++        for (int k = 0; k < 5; ++k) printf(" | %8.2f", nits(pv[k][i]));
++        printf("\n");
++    }
 +    printf("\n== Detail at the top: nits gained per doubling of the scene's light\n");
-+    for (size_t j = 9; j + 1 < g.size(); ++j)
-+        printf("  %4.0f -> %4.0f | %9.1f | %10.1f | %9.1f | %9.1f\n", xs[j], xs[j + 1],
-+               nits(o[j + 1].vplus) - nits(o[j].vplus), nits(o[j + 1].v30) - nits(o[j].v30),
-+               nits(o[j + 1].psychov) - nits(o[j].psychov), nits(o[j + 1].plus) - nits(o[j].plus));
++    for (size_t j = 9; j + 1 < g.size(); ++j) {
++        printf("  %4.0f -> %4.0f | %9.1f | %10.1f", xs[j], xs[j + 1],
++               nits(vanilla_plus(g[j + 1], V(0))) - nits(vanilla_plus(g[j], V(0))), nits(a30[j + 1]) - nits(a30[j]));
++        for (int k = 0; k < 5; ++k) printf(" | %8.1f", nits(pv[k][j + 1]) - nits(pv[k][j]));
++        printf("\n");
++    }
 +    const struct { const char* n; V c; } cols[] = {{"flame orange", {1, .45, .08}}, {"lantern amber", {1, .62, .25}},
 +                                                   {"blood red", {1, .1, .05}}, {"violet glass", {.45, .3, 1}}};
 +    printf("\n== Colors: nits / largest BT.2020 channel (nits) / OKLab hue (degrees) / chroma per lightness\n");
-+    printf("  %-20s | %-24s | %-24s | %-24s | %-24s\n", "", "Vanilla+", "PsychoV-30", "PsychoV", "PsychoV+");
++    printf("  %-20s | %-24s | %-24s | %-24s | %-24s\n", "", "Vanilla+", "PsychoV-30 alone", "PsychoV (VH 0, hue 0)",
++           "PsychoV (VH 100, hue 100)");
 +    for (auto& c : cols) {
 +        std::vector<V> in, z;
-+        for (double l : {0.5, 1.0, 2.0, 5.0, 20.0}) { in.push_back(c.c * l); z.push_back(V(0)); }
-+        auto r = map(in, z);
 +        const double lv[] = {0.5, 1, 2, 5, 20};
-+        for (size_t i = 0; i < r.size(); ++i) {
++        for (double l : lv) { in.push_back(c.c * l); z.push_back(V(0)); }
++        auto c30 = v30(in, z), p0 = psychov(in, z, 0, 0), p1 = psychov(in, z, 1, 1);
++        for (size_t i = 0; i < in.size(); ++i) {
 +            printf("  %-13s x %4.1f", c.n, lv[i]);
-+            for (V v : {r[i].vplus, r[i].v30, r[i].psychov, r[i].plus}) printf(" | %5.0f %5.0f %4.0f %.3f", nits(v), top(v), hue(v), chroma(v));
++            for (V v : {vanilla_plus(in[i], V(0)), c30[i], p0[i], p1[i]})
++                printf(" | %5.0f %5.0f %4.0f %.3f", nits(v), top(v), hue(v), chroma(v));
 +            printf("\n");
 +        }
 +    }
@@ -779,11 +805,12 @@ index 0000000..5f354cc
 +    printf("\n== Bloom: nits / saturation in BT.2020 / green to red / OKLab hue\n");
 +    std::vector<V> bx, bg;
 +    for (auto& b : bl) { bx.push_back(b.x); bg.push_back(b.g); }
-+    auto r = map(bx, bg);
-+    for (size_t i = 0; i < r.size(); ++i) {
++    auto b30 = v30(bx, bg), b0 = psychov(bx, bg, 0, 0), b1 = psychov(bx, bg, 1, 1);
++    for (size_t i = 0; i < bx.size(); ++i) {
 +        printf("  %-31s", bl[i].n);
-+        for (V v : {r[i].vplus, r[i].v30, r[i].psychov, r[i].plus}) {
-+            V b = to2020(v); double mx = std::max(b.x, std::max(b.y, b.z)), mn = std::min(b.x, std::min(b.y, b.z));
++        for (V v : {vanilla_plus(bx[i], bg[i]), b30[i], b0[i], b1[i]}) {
++            V b = to2020(v);
++            double mx = std::max(b.x, std::max(b.y, b.z)), mn = std::min(b.x, std::min(b.y, b.z));
 +            printf(" | %5.0f %.2f %.2f %4.0f", nits(v), mx > 0 ? 1 - mn / mx : 0, b.y / b.x, hue(v));
 +        }
 +        printf("\n");
@@ -1593,10 +1620,10 @@ index 0000000..5bbaf8f
 +#endif // BBPORT_BB_COMPOSITE_GLSL
 diff --git a/gpu/shadps4/video_core/host_shaders/hdr/bb_composite_hdr.frag b/gpu/shadps4/video_core/host_shaders/hdr/bb_composite_hdr.frag
 new file mode 100644
-index 0000000..37b7324
+index 0000000..33a61bb
 --- /dev/null
 +++ b/gpu/shadps4/video_core/host_shaders/hdr/bb_composite_hdr.frag
-@@ -0,0 +1,507 @@
+@@ -0,0 +1,511 @@
 +// SPDX-FileCopyrightText: Copyright 2026 bbport
 +// SPDX-License-Identifier: GPL-2.0-or-later
 +//
@@ -1678,9 +1705,9 @@ index 0000000..37b7324
 +    // Mode 5, PsychoV30 (scene): x the display's peak (game white units), y exposure,
 +    // z highlights, w shadows; bb_hdr2b: x contrast, y saturation (bits plus one, 0: not set),
 +    // z the target gamut (PsychoV30's gamut_compression_mode: 0 BT.709, 1 BT.2020), + 2 for
-+    // PsychoV30 (pure), + 4 for Vanilla+, + 8 for PsychoV+ (PsychoV30 with Vanilla+'s curve above
-+    // mid grey), + 16 for PsychoV (PsychoV30's curve throughout), plus one (0: not set); w the Hue
-+    // Correction of PsychoV and PsychoV+, 0..1 (bits plus one, 0: none).
++    // PsychoV30 (pure), + 4 for Vanilla+, + 16 for PsychoV, + PsychoV's Vanilla+ Highlights in
++    // percent from bit 8, plus one (0: not set); w PsychoV's Hue Correction, 0..1 (bits plus one,
++    // 0: none).
 +    layout(offset = 144) uvec4 bb_hdr2a;
 +    layout(offset = 160) uvec4 bb_hdr2b;
 +} push_data;
@@ -1786,19 +1813,19 @@ index 0000000..37b7324
 +    return true;
 +}
 +
-+// Tone mappers PsychoV (+ 16) and PsychoV+ (+ 8). PsychoV30 with this anchor and cone maps a grey
-+// as a display map (mid grey to mid grey, cone 1) maps the signal v = 0.18 (x / grey_in)^cone.
-+// PsychoV keeps that v throughout: PsychoV-30's own curve. PsychoV+ (`extend`), as the
-+// FromSoftware RenoDX mod feeds PsychoV a vanilla curve continued above mid grey, takes Vanilla+'s
-+// extended curve above grey_in (the game's tangent from mid grey; scaled to 0.18 at grey_in, where
-+// the two meet). Both on the luminance, the color's ratios kept, then in Vanilla+'s order: the
-+// bloom added to v (no screen blend, whose per-channel clamp turned an orange glow yellow-green),
-+// the game's color matrix, then PsychoV30 on the scene color whose v that is
-+// (bb_psychov_vplus_rows), then the menu's Hue Correction towards Vanilla+'s hues
-+// (bb_psychov_vplus_graded).
++// Tone mapper PsychoV (+ 16). PsychoV30 with this anchor and cone maps a grey as a display map (mid
++// grey to mid grey, cone 1) maps the signal v = 0.18 (x / grey_in)^cone: PsychoV-30's own curve.
++// Above grey_in, the menu's Vanilla+ Highlights (`highlights`, 0..1) mixes v in the log with
++// Vanilla+'s extended curve (the game's tangent from mid grey; scaled to 0.18 at grey_in, where the
++// two meet), as the FromSoftware RenoDX mod feeds PsychoV a vanilla curve continued above mid grey:
++// at 1 the highlights have Vanilla+'s brightness, PsychoV30 still compressing them to the peak.
++// On the luminance, the color's ratios kept, then in Vanilla+'s order: the bloom added to v (no
++// screen blend, whose per-channel clamp turned an orange glow yellow-green), the game's color
++// matrix, then PsychoV30 on the scene color whose v that is (bb_psychov_vplus_rows), then the
++// menu's Hue Correction towards Vanilla+'s hues (bb_psychov_vplus_graded).
 +const vec3 BB_Y709 = vec3(0.2126390059, 0.7151686788, 0.0721923154);
 +
-+bool bb_curve_psychov_vplus(BbComposite o, vec3 x, bool extend, out vec3 v) {
++bool bb_curve_psychov_vplus(BbComposite o, vec3 x, float highlights, out vec3 v) {
 +    float grey_in, cone;
 +    if (!bb_psychov_anchor(o, grey_in, cone)) {
 +        v = bb_curve(o, x);
@@ -1806,9 +1833,12 @@ index 0000000..37b7324
 +    }
 +    x = max(x, BB_FLOOR);
 +    float y = dot(x, BB_Y709);
-+    float signal = y < grey_in || !extend
-+                       ? 0.18 * pow(y / grey_in, cone)
-+                       : bb_vanilla_plus_f(o.curve, y) * (0.18 / bb_vanilla_plus_f(o.curve, grey_in));
++    float signal = 0.18 * pow(y / grey_in, cone);
++    if (y > grey_in && highlights > 0.0) {
++        float vanilla_plus =
++            bb_vanilla_plus_f(o.curve, y) * (0.18 / bb_vanilla_plus_f(o.curve, grey_in));
++        signal = exp(mix(log(signal), log(max(vanilla_plus, BB_FLOOR)), highlights));
++    }
 +    v = x * (signal / y);
 +    return true;
 +}
@@ -1950,13 +1980,13 @@ index 0000000..37b7324
 +    return bb_oklab_to_rgb(lab);
 +}
 +
-+// The Hue Correction of PsychoV and PsychoV+ (the in-game menu's, 0..1; bb_hdr2b.w).
++// PsychoV's Hue Correction (the in-game menu's, 0..1; bb_hdr2b.w).
 +float bb_hue_correction() {
 +    return clamp(bb_bits(push_data.bb_hdr2b.w, 0.0), 0.0, 1.0);
 +}
 +
-+// PsychoV and PsychoV+ after the game's matrix (rows in RGB order), their hue moved towards
-+// Vanilla+'s by the menu's Hue Correction (by default 0 for PsychoV, 1 for PsychoV+): PsychoV30's
++// PsychoV after the game's matrix (rows in RGB order), its hue moved towards
++// Vanilla+'s by the menu's Hue Correction (0 by default): PsychoV30's
 +// compression of each cone moves a bright orange towards yellow and a violet towards pink (as the
 +// eye sees a strong light); the game's curve, per channel, keeps the artists' hues. Lightness,
 +// chroma and peak stay PsychoV30's; the reference is Vanilla+'s output for the same pixel (its
@@ -2014,18 +2044,19 @@ index 0000000..37b7324
 +    }
 +    bool psycho_scene = BB_OUTPUT_DELTA && push_data.bb_hdr2a.x != 0u;
 +    bool vanilla_plus = psycho_scene && (bb_choice(push_data.bb_hdr2b.z, 1) & 4) != 0;
-+    // PsychoV (16) and PsychoV+ (8, Vanilla+'s curve above mid grey).
-+    bool psychov_vplus = psycho_scene && (bb_choice(push_data.bb_hdr2b.z, 1) & (8 | 16)) != 0 &&
++    // PsychoV (16), its Vanilla+ Highlights in percent from bit 8.
++    bool psychov_vplus = psycho_scene && (bb_choice(push_data.bb_hdr2b.z, 1) & 16) != 0 &&
 +                         o.curve != 3;
-+    bool psychov_extend = (bb_choice(push_data.bb_hdr2b.z, 1) & 8) != 0;
-+    // Vanilla+, PsychoV and PsychoV+ add the bloom to their curve, before the game's matrix.
++    float psychov_highlights =
++        clamp(float((bb_choice(push_data.bb_hdr2b.z, 1) >> 8) & 0x7F) / 100.0, 0.0, 1.0);
++    // Vanilla+ and PsychoV add the bloom to their curve, before the game's matrix.
 +    bool added_bloom = vanilla_plus || psychov_vplus;
 +    bool has_hdr = false;
 +    if (!BB_ADDITIVE && vanilla_plus) {
 +        hdr_t = bb_curve_vanilla_plus(o, x);
 +        has_hdr = true;
 +    } else if (!BB_ADDITIVE && psychov_vplus) {
-+        has_hdr = bb_curve_psychov_vplus(o, x, psychov_extend, hdr_t);
++        has_hdr = bb_curve_psychov_vplus(o, x, psychov_highlights, hdr_t);
 +    } else if (!BB_ADDITIVE) {
 +        has_hdr = psycho_scene ? bb_curve_psychov_scene(o, x, hdr_t)
 +                               : bb_curve_hdr(o, x, knee, BB_HDR_PEAK, hdr_t);
@@ -7010,7 +7041,7 @@ index e619502..c18d0ee 100644
  
  enum SchedulerType {
 diff --git a/gpu/shadps4/video_core/renderer_vulkan/vk_rasterizer.cpp b/gpu/shadps4/video_core/renderer_vulkan/vk_rasterizer.cpp
-index 265de16..9a42573 100644
+index 265de16..5d68071 100644
 --- a/gpu/shadps4/video_core/renderer_vulkan/vk_rasterizer.cpp
 +++ b/gpu/shadps4/video_core/renderer_vulkan/vk_rasterizer.cpp
 @@ -1,3 +1,4 @@
@@ -7102,27 +7133,27 @@ index 265de16..9a42573 100644
 +        // white, and the color grading sliders as PsychoV30's own parameters, the way RenoDX's
 +        // mods pass them (0..100 sliders over 50: 1 neutral; exposure as it is); then the target
 +        // gamut (PsychoV30's gamut_compression_mode), 2 (no shadow match), 4 for Vanilla+ (its
-+        // own curve and roll-off; the sliders as RenoDX's user grading), 16 for PsychoV
-+        // (PsychoV30's curve and hues, Vanilla+'s bloom) or 8 for PsychoV+ (PsychoV with
-+        // Vanilla+'s curve above mid grey) in one word, their sum + 1; then PsychoV's and
-+        // PsychoV+'s Hue Correction, 0..1 (PsychoV30's gamut compression and compression, which
-+        // this word held, are RenoDX's defaults, 1 and 1).
++        // own curve and roll-off; the sliders as RenoDX's user grading) or 16 for PsychoV
++        // (PsychoV30 with Vanilla+'s bloom), and PsychoV's Vanilla+ Highlights in percent from
++        // bit 8, in one word, their sum + 1; then PsychoV's Hue Correction, 0..1 (PsychoV30's
++        // gamut compression and compression, which this word held, are RenoDX's defaults, 1 and
++        // 1).
 +        const auto bits = [](float f) { return std::bit_cast<u32>(f) + 1u; };
 +        std::array<u32, 8> scene{};
 +        if (HdrChannel::Tonemapper() == u32(BbSettings::HdrToneMapperPsychoScene)) {
 +            const auto& bb = BbSettings::Get();
 +            const auto half = [](float slider) { return std::clamp(slider, 0.0f, 100.0f) / 50.0f; };
++            const bool psychov = bb.hdr_tonemapper == BbSettings::HdrToneMapperPsychoV;
++            const u32 highlights =
++                u32(std::lround(BbSettings::VanillaPlusHighlightsPercent())) << 8u;
 +            scene = {bits(HdrChannel::PeakNits() /
 +                          std::max(float(EmulatorSettings.GetHdrPaperWhite()), 1.0f)),
 +                     bits(std::clamp(bb.hdr_exposure.load(), 0.0f, 2.0f)),
 +                     bits(half(bb.hdr_grade_highlights)), bits(half(bb.hdr_shadows)),
 +                     bits(half(bb.hdr_contrast)), bits(half(bb.hdr_saturation)),
 +                     1u /* BT.2020, RenoDX's HDR target */ +
-+                         (bb.hdr_tonemapper == BbSettings::HdrToneMapperPsychoVPlus ? 2u + 8u
-+                          : bb.hdr_tonemapper == BbSettings::HdrToneMapperPsychoV   ? 2u + 16u
-+                                                                                    : 4u) +
-+                         1u,
-+                     bits(BbSettings::HueCorrectionPercent() / 100.0f)};
++                         (psychov ? 2u + 16u + highlights : 4u) + 1u,
++                     bits(psychov ? BbSettings::HueCorrectionPercent() / 100.0f : 0.0f)};
 +        }
 +        // bb_hdr.y .. bb_hdr2[7], contiguous: one push, then the game's values back.
 +        std::array<u32, 11> probe{bits(knee), HdrChannel::ChainProbe(), bits(bloom)};
@@ -8783,10 +8814,10 @@ index acec36c..fdad67a 100644
          std::vector<MirrorView> views;
          vk::Format format{};
 diff --git a/gpu/shim/bbport_overlay.cpp b/gpu/shim/bbport_overlay.cpp
-index 93b5634..75acf5c 100644
+index 93b5634..bbad55e 100644
 --- a/gpu/shim/bbport_overlay.cpp
 +++ b/gpu/shim/bbport_overlay.cpp
-@@ -405,6 +405,298 @@ const char* Item(const char* english, const char* russian = nullptr) {
+@@ -405,6 +405,295 @@ const char* Item(const char* english, const char* russian = nullptr) {
      return russian ? BbSettings::MenuText(english, russian) : BbSettings::MenuText(english);
  }
  
@@ -8922,30 +8953,37 @@ index 93b5634..75acf5c 100644
 +
 +    ImGui::BeginDisabled(preset == 0);
 +    ImGui::SeparatorText("Tone Mapping");
-+    static const char* tonemappers[] = {"Vanilla+", "PsychoV", "PsychoV+"};
-+    static const int tonemapper_ids[] = {BbSettings::HdrToneMapperVanillaPlus,
-+                                         BbSettings::HdrToneMapperPsychoV,
-+                                         BbSettings::HdrToneMapperPsychoVPlus};
-+    // A slider, as Preset and Settings Mode: Vanilla+ (the default, its reset), PsychoV or
-+    // PsychoV+.
-+    int tone = s.hdr_tonemapper == BbSettings::HdrToneMapperPsychoV       ? 1
-+               : s.hdr_tonemapper == BbSettings::HdrToneMapperPsychoVPlus ? 2
-+                                                                           : 0;
-+    if (NamedSlider("Tone Mapper", tone, tonemappers, 3, 0)) {
-+        Store(s.hdr_tonemapper, tonemapper_ids[std::clamp(tone, 0, 2)], true);
++    static const char* tonemappers[] = {"Vanilla+", "PsychoV"};
++    // A slider, as Preset and Settings Mode: Vanilla+ (the default, its reset) or PsychoV.
++    int tone = s.hdr_tonemapper == BbSettings::HdrToneMapperPsychoV ? 1 : 0;
++    if (NamedSlider("Tone Mapper", tone, tonemappers, 2, 0)) {
++        Store(s.hdr_tonemapper,
++              tone == 1 ? BbSettings::HdrToneMapperPsychoV : BbSettings::HdrToneMapperVanillaPlus,
++              true);
 +    }
 +    Hint(BbSettings::MenuText(
 +        "Vanilla+ (by souperman9, from his RenoDX Bloodborne mod): the game's own image up to mid "
 +        "grey, the lights continued above it and rolled off to your display's peak per color "
-+        "channel. PsychoV: RenoDX's PsychoV-30 on the game's scene, its own colors, with Vanilla+'s "
-+        "bloom (deeper blacks, softer highlights that keep the most detail near the peak). "
-+        "PsychoV+: PsychoV with Vanilla+'s curve above mid grey and Vanilla+'s hues (Vanilla+'s "
-+        "brightness for the brightest lights). Live.",
++        "channel. PsychoV: RenoDX's PsychoV-30 on the game's scene with Vanilla+'s bloom (deeper "
++        "blacks, softer highlights that keep the most detail near the peak); its Vanilla+ "
++        "Highlights and Hue Correction take it towards Vanilla+'s brightness and hues. Live.",
 +        "Vanilla+ (автор souperman9, из его мода RenoDX для Bloodborne): картинка игры до среднего "
 +        "серого, свет выше продолжен и плавно доведён до пика дисплея по каждому каналу. PsychoV: "
-+        "PsychoV-30 из RenoDX на сцене игры, его собственные цвета, со свечением Vanilla+ (глубже "
-+        "чёрный, мягче блики, больше деталей у пика). PsychoV+: PsychoV с кривой Vanilla+ выше "
-+        "среднего серого и оттенками Vanilla+ (яркость Vanilla+ для самого яркого света). Сразу."));
++        "PsychoV-30 из RenoDX на сцене игры со свечением Vanilla+ (глубже чёрный, мягче блики, "
++        "больше деталей у пика); его Vanilla+ Highlights и Hue Correction приближают его к "
++        "яркости и оттенкам Vanilla+. Сразу."));
++    if (tone == 1) {
++        SliderReset("Vanilla+ Highlights", s.hdr_vplus_highlights, 0.0f, 100.0f, 0.0f, "%.0f %%",
++                    BbSettings::MenuText(
++                        "PsychoV's highlights from its own curve (0: the most detail near the "
++                        "peak) to Vanilla+'s (100: Vanilla+'s brightness, the moon and lamps "
++                        "brighter, less detail at the very top), still compressed to your "
++                        "display's peak by PsychoV-30. Shadows and colors do not change.",
++                        "Блики PsychoV от его собственной кривой (0: больше всего деталей у пика) "
++                        "до кривой Vanilla+ (100: яркость Vanilla+, луна и лампы ярче, меньше "
++                        "деталей на самом верху), всё так же сжатые до пика дисплея PsychoV-30. "
++                        "Тени и цвета не меняются."));
++    }
 +    const float display_peak = BbSettings::DisplayPeak();
 +    char peak_hint[200];
 +    if (display_peak > 0.0f) {
@@ -8997,27 +9035,17 @@ index 93b5634..75acf5c 100644
 +    SliderReset("Shadows", s.hdr_shadows, 0.0f, 100.0f, 50.0f, "%.0f", nullptr);
 +    SliderReset("Contrast", s.hdr_contrast, 0.0f, 100.0f, 50.0f, "%.0f", nullptr);
 +    SliderReset("Saturation", s.hdr_saturation, 0.0f, 100.0f, 50.0f, "%.0f", nullptr);
-+    // PsychoV and PsychoV+: how far their hues go to Vanilla+'s (RenoDX's hue correction). Its
-+    // reset is the tone mapper's own, 0 % for PsychoV and 100 % for PsychoV+ (stored as -1).
-+    if (s.hdr_tonemapper == BbSettings::HdrToneMapperPsychoV ||
-+        s.hdr_tonemapper == BbSettings::HdrToneMapperPsychoVPlus) {
-+        ImGui::PushID("Hue Correction");
-+        float hue = BbSettings::HueCorrectionPercent();
-+        const bool changed = ImGui::SliderFloat("Hue Correction", &hue, 0.0f, 100.0f, "%.0f %%");
-+        Store(s.hdr_hue_correction, hue, changed);
-+        ImGui::SameLine();
-+        if (ResetIcon(s.hdr_hue_correction.load() < 0.0f)) {
-+            Store(s.hdr_hue_correction, -1.0f, true);
-+        }
-+        ImGui::PopID();
-+        Hint(BbSettings::MenuText(
-+            "How far the colors take Vanilla+'s hues (RenoDX's hue correction): 0 keeps PsychoV-30's "
-+            "own (bright fires more yellow), 100 Vanilla+'s (fires more orange). Brightness and "
-+            "saturation do not change. Reset: 0 for PsychoV, 100 for PsychoV+.",
-+            "Насколько цвета берут оттенки Vanilla+ (коррекция оттенка RenoDX): 0 оставляет "
-+            "собственные оттенки PsychoV-30 (яркий огонь желтее), 100 оттенки Vanilla+ (огонь "
-+            "оранжевее). Яркость и насыщенность не меняются. Сброс: 0 для PsychoV, 100 для "
-+            "PsychoV+."));
++    // PsychoV: how far its hues go to Vanilla+'s (RenoDX's hue correction).
++    if (s.hdr_tonemapper == BbSettings::HdrToneMapperPsychoV) {
++        SliderReset("Hue Correction", s.hdr_hue_correction, 0.0f, 100.0f, 0.0f, "%.0f %%",
++                    BbSettings::MenuText(
++                        "How far the colors take Vanilla+'s hues (RenoDX's hue correction): 0 "
++                        "keeps PsychoV-30's own (bright fires more yellow), 100 Vanilla+'s (fires "
++                        "more orange). Brightness and saturation do not change.",
++                        "Насколько цвета берут оттенки Vanilla+ (коррекция оттенка RenoDX): 0 "
++                        "оставляет собственные оттенки PsychoV-30 (яркий огонь желтее), 100 "
++                        "оттенки Vanilla+ (огонь оранжевее). Яркость и насыщенность не "
++                        "меняются."));
 +    }
 +    if (level >= 1) {
 +        SliderReset("Color Grade Strength", s.hdr_scene_grading, 0.0f, 100.0f, 100.0f, "%.0f %%",
@@ -9085,7 +9113,7 @@ index 93b5634..75acf5c 100644
  void HdrSection() {
      auto& s = BbSettings::Get();
      Section("HDR output", "Вывод HDR");
-@@ -439,22 +731,41 @@ void HdrSection() {
+@@ -439,22 +728,41 @@ void HdrSection() {
      }
      int mode = std::clamp(s.hdr_mode.load(), 0, BbSettings::HdrModeCount - 1);
      if (const char* label = Item("HDR mode", "Режим HDR")) {
@@ -9099,14 +9127,14 @@ index 93b5634..75acf5c 100644
          Store(s.hdr_mode, mode, mode_changed);
          Hint(BbSettings::MenuText(
 +            "Native+: the light of the game's scene kept to the screen, tone mapped to your display's "
-+            "peak by Vanilla+, PsychoV or PsychoV+, with the "
++            "peak by Vanilla+ or PsychoV, with the "
 +            "RenoDX-style settings below; entering or leaving it applies after restarting the game. "
              "Native: the brightness of lamps, fire, the moon and other highlights comes from the "
              "game's own HDR scene, before its tonemap clipped it to SDR white. Midtones, colours and "
              "the UI stay as in the SDR picture. Menus, loading screens and movies (no scene) use "
              "Expand. Expand: the SDR picture's brightest parts are stretched towards the peak.",
-+            "Native+: свет сцены игры сохраняется до экрана, тонмаппинг под пик дисплея Vanilla+, "
-+            "PsychoV или PsychoV+, с "
++            "Native+: свет сцены игры сохраняется до экрана, тонмаппинг под пик дисплея Vanilla+ "
++            "или PsychoV, с "
 +            "настройками в стиле RenoDX ниже; включение и выключение применяются после перезапуска. "
              "Нативный: яркость ламп, огня, луны и других светлых мест берётся из собственной "
              "HDR-сцены игры, до того как тонмаппинг обрезал её до белого SDR. Средние тона, цвета и "
@@ -9127,7 +9155,7 @@ index 93b5634..75acf5c 100644
      if (const char* label = Item("Paper white (nits)", "Белый SDR (нит)")) {
          Slider(label, s.hdr_paper_white, BbSettings::HdrPaperWhiteMin, BbSettings::HdrPaperWhiteMax, "%.0f",
                 ImGuiSliderFlags_AlwaysClamp);
-@@ -499,19 +810,19 @@ void HdrSection() {
+@@ -499,19 +807,19 @@ void HdrSection() {
              "1 — весь (до пика). Меняются сразу. Ctrl+клик по ползунку — ввести точное значение."));
      }
      if (mode == BbSettings::HdrModeNative) {
@@ -9152,7 +9180,7 @@ index 93b5634..75acf5c 100644
                  "1 — более насыщенные, как на мониторе с широким охватом в SDR (привычный вид; точный sRGB "
                  "рядом с ним может казаться блёклым). Меняются сразу."));
          }
-@@ -551,6 +862,9 @@ void PictureSection() {
+@@ -551,6 +859,9 @@ void PictureSection() {
              "0.25-8)."));
      }
      const bool vignette = s.graphics_vignette;
@@ -9162,7 +9190,7 @@ index 93b5634..75acf5c 100644
      bool moved = false;
      const auto slider = [&](const char* english, const char* russian, std::atomic<float>& value, float lo,
                              float hi, const char* format = "%.2f") {
-@@ -558,12 +872,16 @@ void PictureSection() {
+@@ -558,12 +869,16 @@ void PictureSection() {
              moved |= Slider(label, value, lo, hi, format);
          }
      };
@@ -9183,7 +9211,7 @@ index 93b5634..75acf5c 100644
      if (const char* label = Item("Vignette", "Виньетка")) {
          Checkbox(label, s.graphics_vignette);
          moved |= vignette != s.graphics_vignette;
-@@ -587,6 +905,17 @@ void PictureSection() {
+@@ -587,6 +902,17 @@ void PictureSection() {
          }
      }
      ImGui::EndDisabled();
@@ -9201,7 +9229,7 @@ index 93b5634..75acf5c 100644
  }
  
  void EffectsSection() {
-@@ -1687,6 +2016,7 @@ void Menu() {
+@@ -1687,6 +2013,7 @@ void Menu() {
      bool restart =
          s.object_motion != s.startup_object_motion || s.model_lod != s.startup_model_lod ||
          s.live_resolution != s.startup_live_resolution || s.hdr != s.startup_hdr ||
@@ -9209,7 +9237,7 @@ index 93b5634..75acf5c 100644
          BbSettings::ResolutionNeedsRestart();
      for (int e = 0; e < BbSettings::EffectCount; ++e) {
          restart |= s.effects[e] != s.startup_effects[e];
-@@ -2025,6 +2355,11 @@ bool HandleEvent(const SDL_Event& event) {
+@@ -2025,6 +2352,11 @@ bool HandleEvent(const SDL_Event& event) {
      case SDL_EVENT_KEY_DOWN:
      case SDL_EVENT_KEY_UP: {
          const bool down = event.type == SDL_EVENT_KEY_DOWN;
@@ -9222,7 +9250,7 @@ index 93b5634..75acf5c 100644
              ((event.key.key == SDLK_INSERT && (is_open || MenuKeys() != OverlayKeys::Off)) ||
               (is_open && event.key.key == SDLK_ESCAPE && !io.WantTextInput))) {
 diff --git a/gpu/shim/bbport_settings.cpp b/gpu/shim/bbport_settings.cpp
-index 1778aee..69b68f0 100644
+index 1778aee..50e2836 100644
 --- a/gpu/shim/bbport_settings.cpp
 +++ b/gpu/shim/bbport_settings.cpp
 @@ -10,11 +10,14 @@
@@ -9253,7 +9281,7 @@ index 1778aee..69b68f0 100644
  const char* Path() {
      const char* env = std::getenv("BB_CONFIG");
      return env && env[0] ? env : "lantern.ini";
-@@ -299,24 +308,66 @@ void Set(Values& v, const std::string& key, const std::string& value) {
+@@ -299,24 +308,76 @@ void Set(Values& v, const std::string& key, const std::string& value) {
          v.hdr_peak = Clamp(std::isfinite(f) ? f : HdrPeakDefault, HdrPeakMin, HdrPeakMax);
      } else if (key == "hdr_peak_auto") {
          v.hdr_peak_auto = i != 0;
@@ -9311,20 +9339,30 @@ index 1778aee..69b68f0 100644
 +    } else if (key == "hdr_black_floor") {
 +        v.hdr_black_floor = Clamp(std::isfinite(f) ? f : 0.0f, 0.0f, 2.0f);
 +    } else if (key == "hdr_hue_correction") {
-+        // Below 0 (or not a number): the tone mapper's own.
-+        v.hdr_hue_correction = std::isfinite(f) && f >= 0.0f ? Clamp(f, 0.0f, 100.0f) : -1.0f;
++        // Below 0 (a test build's "not set") or not a number: left as it is (the default, or
++        // 100 % from hdr_tonemapper=7 read before it).
++        if (std::isfinite(f) && f >= 0.0f) {
++            v.hdr_hue_correction = Clamp(f, 0.0f, 100.0f);
++        }
++    } else if (key == "hdr_vplus_highlights") {
++        v.hdr_vplus_highlights = Clamp(std::isfinite(f) ? f : 0.0f, 0.0f, 100.0f);
 +    } else if (key == "hdr_tonemapper") {
-+        // PsychoV, PsychoV+ or Vanilla+; the earlier Vanilla, Hybrid, Neutwo and PsychoV-17 read
-+        // as Vanilla+.
++        // PsychoV or Vanilla+. 7, 0.9.38.2's PsychoV (Vanilla+'s curve above mid grey and its
++        // hues), is PsychoV with both sliders at 100 %; the earlier Vanilla, Hybrid, Neutwo and
++        // PsychoV-17 read as Vanilla+.
++        if (i == HdrToneMapperPsychoVPlus) {
++            v.hdr_vplus_highlights = 100.0f;
++            v.hdr_hue_correction = 100.0f;
++        }
 +        v.hdr_tonemapper = i == HdrToneMapperPsychoV || i == HdrToneMapperPsychoVPlus
-+                               ? i
++                               ? HdrToneMapperPsychoV
 +                               : HdrToneMapperVanillaPlus;
 +    } else if (key == "hdr_compare") {
 +        v.hdr_compare = std::clamp(i, 0, 1);
      } else if (key == "live_resolution") {
          v.live_resolution = value == "auto" ? -1 : std::clamp(i, 0, 1);
      } else if (key == "cheat_vials") {
-@@ -380,8 +431,124 @@ MenuLanguage LanguageOfLocale(const char* lang) {
+@@ -380,8 +441,125 @@ MenuLanguage LanguageOfLocale(const char* lang) {
      return MenuLanguage::English;
  }
  
@@ -9351,6 +9389,7 @@ index 1778aee..69b68f0 100644
 +    add("hdr_scene_grading=%.0f", v.hdr_scene_grading.load());
 +    add("hdr_black_floor=%.2f", v.hdr_black_floor.load());
 +    add("hdr_hue_correction=%.0f", v.hdr_hue_correction.load());
++    add("hdr_vplus_highlights=%.0f", v.hdr_vplus_highlights.load());
 +    return out;
 +}
 +
@@ -9384,7 +9423,8 @@ index 1778aee..69b68f0 100644
 +    v.hdr_bloom = 50.0f;
 +    v.hdr_scene_grading = 100.0f;
 +    v.hdr_black_floor = 0.0f;
-+    v.hdr_hue_correction = -1.0f;
++    v.hdr_hue_correction = 0.0f;
++    v.hdr_vplus_highlights = 0.0f;
 +}
 +
 +} // namespace
@@ -9415,8 +9455,8 @@ index 1778aee..69b68f0 100644
 +
 +void ResetHdr() {
 +    ResetHdr(Get());
- }
- 
++}
++
 +float DisplayPeak() {
 +    return Get().hdr_display_peak.load();
 +}
@@ -9432,24 +9472,23 @@ index 1778aee..69b68f0 100644
 +}
 +
 +float HueCorrectionPercent() {
-+    const auto& v = Get();
-+    const float set = v.hdr_hue_correction.load();
-+    if (set >= 0.0f) {
-+        return std::min(set, 100.0f);
-+    }
-+    return v.hdr_tonemapper.load() == HdrToneMapperPsychoVPlus ? 100.0f : 0.0f;
++    return std::clamp(Get().hdr_hue_correction.load(), 0.0f, 100.0f);
++}
++
++float VanillaPlusHighlightsPercent() {
++    return std::clamp(Get().hdr_vplus_highlights.load(), 0.0f, 100.0f);
 +}
 +
 +void SetDisplayPeak(float nits) {
 +    Get().hdr_display_peak = nits > 0.0f ? nits : 0.0f;
-+}
-+
+ }
+ 
 +// The display's size for output_res = auto: BB_DISPLAY_SIZE ("WxH", from run_windows.py), even
 +// (the game has half-resolution buffers); 1920x1080 without it.
  static std::pair<int, int> DisplaySize() {
      static const std::pair<int, int> size = [] {
          int w = 0, h = 0;
-@@ -441,8 +608,13 @@ void Load() {
+@@ -441,8 +619,13 @@ void Load() {
          }
          v.menu_language = LanguageOfLocale(lang);
      }
@@ -9464,7 +9503,7 @@ index 1778aee..69b68f0 100644
          while (std::fgets(line, sizeof(line), file)) {
              std::string text{line};
              text.erase(text.find_last_not_of(" \t\r\n") + 1);
-@@ -455,6 +627,15 @@ void Load() {
+@@ -455,6 +638,15 @@ void Load() {
          std::fclose(file);
          std::printf("Settings: %s\n", Path());
      }
@@ -9480,7 +9519,7 @@ index 1778aee..69b68f0 100644
      if (const char* env = std::getenv("BB_UPSCALER")) {
          v.upscaler = UpscalerOff;
          for (int u = 0; u < UpscalerCount; ++u) {
-@@ -496,6 +677,7 @@ void Load() {
+@@ -496,6 +688,7 @@ void Load() {
      v.startup_hdr = v.hdr;
      v.startup_optiscaler = {v.optiscaler_compat, v.optiscaler_ngx_lock, v.optiscaler_clean_thread,
                              v.optiscaler_sync_submit};
@@ -9488,7 +9527,7 @@ index 1778aee..69b68f0 100644
  }
  
  void ConfigureUpscalerSupport(bool fsr4, bool fsr411, bool dlss) {
-@@ -614,9 +796,35 @@ void Save() {
+@@ -614,9 +807,36 @@ void Save() {
      put("hdr_peak", fixed(v.hdr_peak, 0));
      put("hdr_peak_auto", flag(v.hdr_peak_auto));
      put("hdr_boost", fixed(v.hdr_boost, 2));
@@ -9504,6 +9543,7 @@ index 1778aee..69b68f0 100644
 +    put("hdr_scene_grading", fixed(v.hdr_scene_grading, 3));
 +    put("hdr_black_floor", fixed(v.hdr_black_floor, 3));
 +    put("hdr_hue_correction", fixed(v.hdr_hue_correction, 0));
++    put("hdr_vplus_highlights", fixed(v.hdr_vplus_highlights, 0));
 +    put("hdr_tonemapper", std::to_string(v.hdr_tonemapper.load()));
      put("hdr_mode", HdrModeNames[std::clamp(v.hdr_mode.load(), 0, HdrModeCount - 1)]);
 +    // The HDR presets (in-game menu): the selected one holds the settings above.
@@ -9525,7 +9565,7 @@ index 1778aee..69b68f0 100644
      put("graphics_controls",flag(v.graphics_controls));
      put("graphics_vignette",flag(v.graphics_vignette));
      put("graphics_ao_strength",fixed(v.graphics_ao_strength,2));
-@@ -668,7 +876,7 @@ void Save() {
+@@ -668,7 +888,7 @@ void Save() {
      bool had_lines = false;
      std::vector<bool> written(keys.size());
      if (FILE* file = std::fopen(Path(), "r")) {
@@ -9534,7 +9574,7 @@ index 1778aee..69b68f0 100644
          while (std::fgets(line, sizeof(line), file)) {
              had_lines = true;
              std::string text{line};
-@@ -678,6 +886,10 @@ void Save() {
+@@ -678,6 +898,10 @@ void Save() {
                  std::string key = text.substr(0, eq);
                  key.erase(key.find_last_not_of(" \t") + 1);
                  key.erase(0, key.find_first_not_of(" \t"));
@@ -9546,28 +9586,29 @@ index 1778aee..69b68f0 100644
                                               [&](const auto& k) { return k.first == key; });
                  if (it != keys.end()) {
 diff --git a/gpu/shim/bbport_settings.h b/gpu/shim/bbport_settings.h
-index dd4ae62..3abee10 100644
+index dd4ae62..b718550 100644
 --- a/gpu/shim/bbport_settings.h
 +++ b/gpu/shim/bbport_settings.h
-@@ -5,6 +5,17 @@
+@@ -5,6 +5,18 @@
  #include <atomic>
  
  namespace BbSettings {
-+/// hdr_tonemapper: 5 Vanilla+ (the default; souperman9's, from his RenoDX Bloodborne mod),
-+/// 4 PsychoV (RenoDX's PsychoV-30 with its own curve and hues; Vanilla+'s bloom) or 7 PsychoV+
-+/// (PsychoV with Vanilla+'s curve above mid grey), all on the scene in the composite, BT.2020: the
-+/// final pass only encodes (HdrChannel::Tonemapper reports HdrToneMapperPsychoScene). Any other
-+/// value (6 was PsychoV-17) reads as Vanilla+. HdrToneMapperVanilla (the game's own look) is the
-+/// HDR preset Off's, not a choice. (0.9.38.2 had 7 alone, as PsychoV, and read 4 as it.)
++/// hdr_tonemapper: 5 Vanilla+ (the default; souperman9's, from his RenoDX Bloodborne mod) or
++/// 4 PsychoV (RenoDX's PsychoV-30 with Vanilla+'s bloom; its Vanilla+ Highlights and Hue
++/// Correction sliders take it towards Vanilla+'s curve and hues), both on the scene in the
++/// composite, BT.2020: the final pass only encodes (HdrChannel::Tonemapper reports
++/// HdrToneMapperPsychoScene). 7, 0.9.38.2's PsychoV, reads as PsychoV with both sliders at 100 %;
++/// any other value (6 was PsychoV-17) as Vanilla+. HdrToneMapperVanilla (the game's own look) is
++/// the HDR preset Off's, not a choice.
 +inline constexpr int HdrToneMapperVanilla = 2, HdrToneMapperPsychoScene = 3;
 +inline constexpr int HdrToneMapperPsychoV = 4;
 +inline constexpr int HdrToneMapperVanillaPlus = 5;
-+inline constexpr int HdrToneMapperPsychoVPlus = 7;
++inline constexpr int HdrToneMapperPsychoVPlus = 7; ///< read as PsychoV, both sliders at 100 %
 +
  
  enum Upscaler : int { UpscalerOff = 0, UpscalerFsr3 = 1, UpscalerFsr4 = 2, UpscalerFsr411 = 3,
                        UpscalerTaa = 4, UpscalerDlss = 5, UpscalerCount };
-@@ -66,13 +77,23 @@ int OutputHeight(int index);
+@@ -66,13 +78,23 @@ int OutputHeight(int index);
  inline constexpr int CheatOff = 0, CheatInfinite = -1, CheatMaxAmount = 99;
  inline constexpr int CheatGunRanges[] = {0, 150, 200, 300};
  inline constexpr int CheatEchoMultipliers[] = {1, 2, 5, 10};
@@ -9594,7 +9635,7 @@ index dd4ae62..3abee10 100644
  static_assert(sizeof(HdrModeNames) / sizeof(HdrModeNames[0]) == HdrModeCount);
  
  inline constexpr int DlssPresetDefault = 0, DlssPresetK = 11, DlssPresetMax = 26;
-@@ -165,8 +186,10 @@ struct Values {
+@@ -165,8 +187,10 @@ struct Values {
          hdr_boost{HdrBoostDefault};
      std::atomic<bool> hdr_peak_auto{true};
      std::atomic<float> hdr_display_peak{0.0f};
@@ -9607,7 +9648,7 @@ index dd4ae62..3abee10 100644
      std::atomic<int> hdr_mode{HdrModeNative};
      std::atomic<int> hdr_output{HdrOutputOff};
      std::atomic<int> live_resolution{0};
-@@ -193,6 +216,45 @@ struct Values {
+@@ -193,6 +217,47 @@ struct Values {
      int startup_model_lod = 0;
      int startup_output_res = OutputDefault;
      int startup_live_resolution = 0;
@@ -9616,9 +9657,11 @@ index dd4ae62..3abee10 100644
 +    std::atomic<float> hdr_grade_highlights{50.0f};
 +    std::atomic<float> hdr_shadows{50.0f};
 +    std::atomic<float> hdr_saturation{50.0f};
-+    /// PsychoV and PsychoV+: how far their hues go to Vanilla+'s, 0..100 %; below 0 the tone
-+    /// mapper's own (HueCorrectionPercent).
-+    std::atomic<float> hdr_hue_correction{-1.0f};
++    /// PsychoV: how far its hues go to Vanilla+'s (Hue Correction), 0..100 %.
++    std::atomic<float> hdr_hue_correction{0.0f};
++    /// PsychoV: how far its highlights take Vanilla+'s curve above mid grey (Vanilla+
++    /// Highlights), 0..100 %.
++    std::atomic<float> hdr_vplus_highlights{0.0f};
 +    std::atomic<float> hdr_highlight_saturation{50.0f};
 +    std::atomic<float> hdr_blowout{0.0f};
 +    std::atomic<float> hdr_bloom{50.0f};    ///< the game's bloom, 0..100, 50 as drawn
@@ -9653,7 +9696,7 @@ index dd4ae62..3abee10 100644
      bool startup_hdr = false;
  };
  
-@@ -212,8 +274,28 @@ void ConfigureUpscalerSupport(bool fsr4, bool fsr411, bool dlss = false);
+@@ -212,8 +277,28 @@ void ConfigureUpscalerSupport(bool fsr4, bool fsr411, bool dlss = false);
  bool FixedRenderSession();
  int RenderPreset();
  bool ResolutionNeedsRestart();
@@ -9670,9 +9713,9 @@ index dd4ae62..3abee10 100644
 +/// The display's peak luminance (hdr_display_peak, 0: unknown; window.cpp sets it, tests too).
 +void SetDisplayPeak(float nits);
 +float DisplayPeak();
-+/// Hue Correction in effect, 0..100 %: hdr_hue_correction, or below 0 (not set) the tone mapper's
-+/// own, 0 for PsychoV and 100 for PsychoV+.
++/// PsychoV's Hue Correction and Vanilla+ Highlights in effect, 0..100 %.
 +float HueCorrectionPercent();
++float VanillaPlusHighlightsPercent();
 +/// Peak Brightness default: the display's peak, else 1000 nits.
 +float DefaultPeakNits();
 +/// Game Brightness default: 203 nits (BT.2408's reference white), for every display.
@@ -9787,7 +9830,7 @@ index 3b26aff..e13b448 100644
      const uint64_t now=now_us();
      if (!gamepad || (want && !on_preferred && now-last_scan>1000000)) {
 diff --git a/tests/test_settings.cpp b/tests/test_settings.cpp
-index b9d9eef..4e46489 100644
+index b9d9eef..2630679 100644
 --- a/tests/test_settings.cpp
 +++ b/tests/test_settings.cpp
 @@ -141,7 +141,7 @@ int main() {
@@ -9799,7 +9842,7 @@ index b9d9eef..4e46489 100644
      assert(Read(path).find("hdr_peak=1000\n") != std::string::npos);
      assert(Read(path).find("hdr_boost=0.25\n") != std::string::npos);
      assert(s.hdr_mode == BbSettings::HdrModeNative);
-@@ -282,6 +282,127 @@ int main() {
+@@ -282,6 +282,137 @@ int main() {
      BbSettings::Load();
      assert(s.frame_gen == BbSettings::FrameGenFsr3 && s.reflex == BbSettings::ReflexOn &&
             s.render_scale == BbSettings::RenderScaleMax);
@@ -9849,10 +9892,10 @@ index b9d9eef..4e46489 100644
 +    BbSettings::SetDisplayPeak(0.0f);
 +    BbSettings::SelectHdrPreset(0); // Off keeps the values; the renderer shows the game's look
 +    assert(s.hdr_preset == 0 && s.hdr_saturation == 50.0f);
-+    // Tone mappers: Vanilla+ by default; PsychoV (4) and PsychoV+ (7) saved, read back and kept
-+    // per preset; the earlier Vanilla (2), Hybrid (3), Neutwo (0) and PsychoV-17 (6) read as
-+    // Vanilla+. The removed settings (target gamut, gamut compression, compression,
-+    // colour-table bridge) are ignored.
++    // Tone mappers: Vanilla+ by default; PsychoV (4) saved, read back and kept per preset; 0.9.38.2's
++    // PsychoV (7) read as PsychoV with Vanilla+ Highlights and Hue Correction at 100 %; the earlier
++    // Vanilla (2), Hybrid (3), Neutwo (0) and PsychoV-17 (6) read as Vanilla+. The removed
++    // settings (target gamut, gamut compression, compression, colour-table bridge) are ignored.
 +    { std::ofstream file(path); file << "hdr=1\nhdr_mode=psychov30\n"; }
 +    BbSettings::Load();
 +    assert(s.hdr_tonemapper == BbSettings::HdrToneMapperVanillaPlus);
@@ -9868,11 +9911,16 @@ index b9d9eef..4e46489 100644
 +    assert(s.hdr_tonemapper == BbSettings::HdrToneMapperVanillaPlus);
 +    BbSettings::SelectHdrPreset(1);
 +    assert(s.hdr_tonemapper == BbSettings::HdrToneMapperPsychoV);
-+    { std::ofstream file(path); file << "hdr=1\nhdr_mode=nativeplus\nhdr_tonemapper=7\n"; }
++    BbSettings::ResetHdr();
++    { std::ofstream file(path); file << "hdr=1\nhdr_mode=nativeplus\nhdr_hue_correction=-1\n"
++                                        "hdr_tonemapper=7\n"; }
 +    BbSettings::Load();
-+    assert(s.hdr_tonemapper == BbSettings::HdrToneMapperPsychoVPlus);
++    assert(s.hdr_tonemapper == BbSettings::HdrToneMapperPsychoV &&
++           s.hdr_vplus_highlights == 100.0f && s.hdr_hue_correction == 100.0f);
 +    BbSettings::Save();
-+    assert(Read(path).find("hdr_tonemapper=7\n") != std::string::npos);
++    assert(Read(path).find("hdr_tonemapper=4\n") != std::string::npos &&
++           Read(path).find("hdr_vplus_highlights=100\n") != std::string::npos &&
++           Read(path).find("hdr_hue_correction=100\n") != std::string::npos);
 +    for (const char* earlier : {"0", "2", "3", "6"}) {
 +        { std::ofstream file(path); file << "hdr=1\nhdr_mode=psychov30\nhdr_tonemapper=" << earlier
 +                                         << "\nhdr_gamut=bt709\nhdr_lut_bridge=renodx\n"
@@ -9880,32 +9928,37 @@ index b9d9eef..4e46489 100644
 +        BbSettings::Load();
 +        assert(s.hdr_tonemapper == BbSettings::HdrToneMapperVanillaPlus);
 +    }
-+    // Hue Correction: not set (-1) by default, then the tone mapper's own (PsychoV 0 %, PsychoV+
-+    // 100 %); a value set is kept per preset, saved and read back; out of range clamped, below 0
-+    // back to not set.
-+    { std::ofstream file(path); file << "hdr=1\nhdr_mode=nativeplus\nhdr_tonemapper=4\n"; }
-+    BbSettings::Load();
-+    assert(s.hdr_hue_correction == -1.0f && BbSettings::HueCorrectionPercent() == 0.0f);
-+    s.hdr_tonemapper = BbSettings::HdrToneMapperPsychoVPlus;
-+    assert(BbSettings::HueCorrectionPercent() == 100.0f);
-+    s.hdr_hue_correction = 40.0f;
-+    assert(BbSettings::HueCorrectionPercent() == 40.0f);
-+    BbSettings::Save();
-+    assert(Read(path).find("hdr_hue_correction=40\n") != std::string::npos);
-+    BbSettings::Load();
-+    assert(s.hdr_hue_correction == 40.0f);
-+    BbSettings::SelectHdrPreset(2);
-+    assert(s.hdr_hue_correction == -1.0f);
-+    BbSettings::SelectHdrPreset(1);
-+    assert(s.hdr_hue_correction == 40.0f);
++    // PsychoV's Vanilla+ Highlights and Hue Correction: 0 by default, kept per preset, saved and
++    // read back, clamped to 0..100; a Hue Correction below 0 (a test build's "not set") is ignored.
 +    BbSettings::ResetHdr();
-+    assert(s.hdr_hue_correction == -1.0f);
-+    for (const auto& [text, value] : {std::pair{"250", 100.0f}, {"-5", -1.0f}, {"nan", -1.0f}}) {
++    assert(s.hdr_hue_correction == 0.0f && s.hdr_vplus_highlights == 0.0f);
++    s.hdr_tonemapper = BbSettings::HdrToneMapperPsychoV;
++    s.hdr_hue_correction = 40.0f;
++    s.hdr_vplus_highlights = 65.0f;
++    assert(BbSettings::HueCorrectionPercent() == 40.0f &&
++           BbSettings::VanillaPlusHighlightsPercent() == 65.0f);
++    BbSettings::Save();
++    assert(Read(path).find("hdr_hue_correction=40\n") != std::string::npos &&
++           Read(path).find("hdr_vplus_highlights=65\n") != std::string::npos);
++    BbSettings::Load();
++    assert(s.hdr_hue_correction == 40.0f && s.hdr_vplus_highlights == 65.0f);
++    BbSettings::SelectHdrPreset(2);
++    assert(s.hdr_hue_correction == 0.0f && s.hdr_vplus_highlights == 0.0f);
++    BbSettings::SelectHdrPreset(1);
++    assert(s.hdr_hue_correction == 40.0f && s.hdr_vplus_highlights == 65.0f);
++    for (const char* text : {"-5", "nan"}) {
 +        { std::ofstream file(path); file << "hdr=1\nhdr_mode=nativeplus\nhdr_hue_correction="
-+                                         << text << "\n"; }
++                                         << text << "\nhdr_vplus_highlights=" << text << "\n"; }
++        s.hdr_hue_correction = 30.0f;
 +        BbSettings::Load();
-+        assert(s.hdr_hue_correction == value);
++        assert(s.hdr_hue_correction == 30.0f && s.hdr_vplus_highlights == 0.0f);
 +    }
++    { std::ofstream file(path); file << "hdr=1\nhdr_mode=nativeplus\nhdr_hue_correction=250\n"
++                                        "hdr_vplus_highlights=250\n"; }
++    BbSettings::Load();
++    assert(s.hdr_hue_correction == 100.0f && s.hdr_vplus_highlights == 100.0f);
++    BbSettings::ResetHdr();
++    assert(s.hdr_hue_correction == 0.0f && s.hdr_vplus_highlights == 0.0f);
 +   // UI Brightness in nits (203 by default, 48..500); the earlier ratio converted with the
 +    // paper white written before it, and not written back.
 +    assert(s.hdr_ui_nits == 203.0f);

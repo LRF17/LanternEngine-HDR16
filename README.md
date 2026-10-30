@@ -2,13 +2,12 @@
 
 HDR for Bloodborne on [Lantern Engine](https://github.com/Awakenchan/LanternEngine) by Awaken.
 **Native+** keeps the light of the game's scene all the way to the screen and tone maps it to
-your display's peak, with an in-game menu laid out like a RenoDX mod. Three tone mappers:
+your display's peak, with an in-game menu laid out like a RenoDX mod. Two tone mappers:
 
 - **Vanilla+** (default), by **souperman9**, from his RenoDX Bloodborne mod: the game's own image,
   with brighter highlights up to your display's peak.
 - **PsychoV**: RenoDX's PsychoV-30 with the game's bloom kept: deeper blacks, softer highlights
-  with the most detail near the peak.
-- **PsychoV+**: PsychoV with Vanilla+'s brightness and hues for the brightest lights.
+  with the most detail near the peak. Two sliders take it towards Vanilla+'s brightness and hues.
 
 Native+ works with Lantern's upscalers and with frame generation (DLSS and FSR 3.1). Lantern's
 own README and credits are in [README-Lantern.md](README-Lantern.md).
@@ -80,13 +79,14 @@ Settings marked *Intermediate* or *Advanced* are shown from that Settings Mode o
 | Preset | Off, #1 to #3 (#1) | Off is the game's own look in HDR10, without HDR highlights. Each numbered preset keeps its own settings. |
 | Settings Mode | Simple, Intermediate, Advanced (Simple) | How many settings the menu shows. |
 | **Tone Mapping** | | |
-| Tone Mapper | Vanilla+, PsychoV, PsychoV+ (Vanilla+) | See [Tone mappers](#tone-mappers). |
+| Tone Mapper | Vanilla+, PsychoV (Vanilla+) | See [Tone mappers](#tone-mappers). |
+| Vanilla+ Highlights *(PsychoV)* | 0 to 100 % (0) | PsychoV's highlights from its own curve (0: the most detail near the peak) to Vanilla+'s (100: Vanilla+'s brightness, less detail at the very top). Shadows and colors unchanged. |
 | Peak Brightness | 400 to 4000 nits (your display's) | The brightest your display can show: the value Windows reports while not set by hand, 1000 if Windows reports none. The reset button goes back to the display's. |
 | Game Brightness | 80 to 500 nits (203) | The brightness of the game's white (the launcher's Paper white). |
 | UI Brightness | 48 to 500 nits (203) | The HUD and menus' white, whatever Game Brightness. |
 | **Color Grading** | | |
-| Exposure, Highlights, Shadows, Contrast, Saturation | 1.00, 50, 50, 50, 50 | Vanilla+: RenoDX's grading. PsychoV and PsychoV+: PsychoV-30's own parameters. Neutral at these values. |
-| Hue Correction *(PsychoV, PsychoV+)* | 0 to 100 % (0 for PsychoV, 100 for PsychoV+) | How far the colors take Vanilla+'s hues (RenoDX's hue correction): 0 keeps PsychoV-30's own, with brighter fires more yellow; 100 Vanilla+'s, more orange. Brightness and saturation unchanged. |
+| Exposure, Highlights, Shadows, Contrast, Saturation | 1.00, 50, 50, 50, 50 | Vanilla+: RenoDX's grading. PsychoV: PsychoV-30's own parameters. Neutral at these values. |
+| Hue Correction *(PsychoV)* | 0 to 100 % (0) | How far the colors take Vanilla+'s hues (RenoDX's hue correction): 0 keeps PsychoV-30's own, with bright fires more yellow; 100 Vanilla+'s, more orange. Brightness and saturation unchanged. |
 | Color Grade Strength *(Intermediate)* | 0 to 100 % (100) | The game's own color grading: 100 is the game's look, 0 the image before it. |
 | Black Floor *(Intermediate)* | 0 to 2 nits (0) | Takes the game's darkest greys down to true black (OLED). |
 | **Effects** | | |
@@ -121,19 +121,20 @@ replace them.
   grey, with the game's contrast there, then a perceptual shoulder to your display's peak. The
   game's bloom is added before the compression, so an orange glow stays orange. Deeper shadows
   than the game's, softer highlights that keep the most gradation near the peak; very bright
-  fires turn a little yellower, as PsychoV-30 renders a strong light (Hue Correction at 0 %).
-- **PsychoV+**: PsychoV with Vanilla+'s curve above mid grey, compressed by PsychoV-30, and
-  Vanilla+'s hues (Hue Correction at 100 %: fires stay orange): PsychoV's shadows, Vanilla+'s
-  brightness for the brightest lights (the sun reaches the peak), the moon and lamps about 10 %
-  below Vanilla+.
+  fires turn a little yellower, as PsychoV-30 renders a strong light. Its two sliders:
+  - **Vanilla+ Highlights** (Tone Mapping, 0 to 100 %): above mid grey, from PsychoV-30's curve
+    to Vanilla+'s, still compressed to your display's peak by PsychoV-30. At 100 % the brightest
+    lights reach Vanilla+'s brightness (the sun reaches the peak), the moon and lamps about 10 %
+    below Vanilla+, with less gradation at the very top. Shadows and colors do not change.
+  - **Hue Correction** (Color Grading, 0 to 100 %): from PsychoV-30's own hues to Vanilla+'s
+    (RenoDX's hue correction; fires more orange). Only the hue moves, not the brightness or the
+    saturation.
 
-Both have a **Hue Correction** slider (Color Grading) from PsychoV-30's own hues (0 %) to
-Vanilla+'s (100 %), RenoDX's hue correction: only the hue moves, not the brightness or the
-saturation.
+  Both at 100 % is 0.9.38.2's PsychoV.
 
-Every color stays within BT.2020 and under the peak with both PsychoV. Their colors are softer
-than Vanilla+'s near the peak (their **Saturation** raises them). How each was built and
-measured, in the game and on RenoDX's own code: [docs/TONEMAPPERS.md](docs/TONEMAPPERS.md).
+Every color stays within BT.2020 and under the peak with PsychoV. Its colors are softer than
+Vanilla+'s near the peak (its **Saturation** raises them). How it was built and measured, in the
+game and on RenoDX's own code: [docs/TONEMAPPERS.md](docs/TONEMAPPERS.md).
 
 Preset **Off** shows the game's own SDR look in HDR10, as a reference.
 
@@ -179,12 +180,13 @@ Preset **Off** shows the game's own SDR look in HDR10, as a reference.
 - **Updating from an earlier version**: your settings are kept. Settings that no longer exist
   (Target gamut, Gamut Compression, Compression, Color Table Bridge) are ignored, the old tone
   mappers (Vanilla, Hybrid, Neutwo) read as Vanilla+, and `hdr_mode=psychov30` reads as
-  `nativeplus`. 0.9.38.2's PsychoV is 0.9.38.3's PsychoV+: who chose it keeps it. A `bbport.ini` from before Lantern 0.9.37 is copied to `lantern.ini` once.
+  `nativeplus`. 0.9.38.2's PsychoV reads as PsychoV with both its sliders at 100 %: who chose it
+  keeps its look. A `bbport.ini` from before Lantern 0.9.37 is copied to `lantern.ini` once.
 
 ## How it works
 
 - **16-bit chain.** The game draws its final image in 8 bits, clipped at white. Native+ replaces
-  the game's final composite: the scene is tone mapped there (Vanilla+, PsychoV or PsychoV+), and every
+  the game's final composite: the scene is tone mapped there (Vanilla+ or PsychoV), and every
   pass after it (the color table, the upscaler, the display copy) runs in 16-bit float, so the
   light above white reaches the screen. The final pass converts to HDR10 (or scRGB with FSR frame
   generation).

@@ -1,6 +1,6 @@
 # Native+ tone mappers (0.9.38.3)
 
-Native+ has three tone mappers: **Vanilla+** (the default), **PsychoV** and **PsychoV+**. This
+Native+ has two tone mappers: **Vanilla+** (the default) and **PsychoV**, with its two sliders. This
 page says how each is built, why, what was measured (on a model with RenoDX's own code, and in the game), and what
 was tried and not kept. The code is the one the workflow builds: Lantern 0.9.38 (`4715bca`) with
 `ports/lantern/nativeplus-engine.patch`; the references are RenoDX `b6b32f4` (`test30.hlsl`,
@@ -56,24 +56,24 @@ channel with `CInfinityRollOff` around the table, in the encoded domain) and in 
 the addon sRGB or 2.2). These change saturated highlights through a strong table, not the
 brightness **[to measure]**.
 
-## PsychoV and PsychoV+
+## PsychoV
 
-Both are RenoDX's **PsychoV-30** (`psychotm_test30`, ported to GLSL and checked against RenoDX's
-HLSL below), built in four steps, each from a difference seen in the game; they differ in the
-first step and in the fourth's default. PsychoV (`hdr_tonemapper=4`) is PsychoV-30's own curve
-and colors; PsychoV+ (7, called
-PsychoV in 0.9.38.2) takes Vanilla+'s curve above mid grey, an idea taken from the FromSoftware
-Engine RenoDX mod's structure (a game curve continued above mid grey, then a PsychoV as the
-display mapping), not its operator.
+RenoDX's **PsychoV-30** (`psychotm_test30`, ported to GLSL and checked against RenoDX's HLSL
+below), `hdr_tonemapper=4`, built in four steps, each from a difference seen in the game. Two
+sliders take it towards Vanilla+: **Vanilla+ Highlights** (step 1, `hdr_vplus_highlights`) and
+**Hue Correction** (step 4, `hdr_hue_correction`), both 0 to 100 %, 0 by default. Both at 100 %
+is 0.9.38.2's PsychoV (`hdr_tonemapper=7`, read so): Vanilla+'s curve above mid grey, an idea
+taken from the FromSoftware Engine RenoDX mod's structure (a game curve continued above mid
+grey, then a PsychoV as the display mapping), not its operator.
 
 1. **Signal.** On the scene's luminance `y` (the color's ratios kept), `v = 0.18 (y / grey_in)^cone`,
    `grey_in` where the game's curve gives mid grey (0.18), `cone` the game's log-log slope there.
    PsychoV-30 anchored at `grey_in` with that cone maps a grey exactly as it maps this `v` from mid
-   grey with a cone of 1 **[contract: test30's F]**: PsychoV's greys are PsychoV-30's own.
-   PsychoV+ keeps that `v` below `grey_in` (PsychoV-30's shadows) and takes Vanilla+'s extended
-   curve above it, scaled to meet at `grey_in`: PsychoV-30 tends to the peak only as the light
-   grows without bound (half the peak around x = 3); on this signal its highlights are Vanilla+'s
-   brightness.
+   grey with a cone of 1 **[contract: test30's F]**: PsychoV's greys are PsychoV-30's own. Above
+   `grey_in`, Vanilla+ Highlights mixes that `v`, in the log, with Vanilla+'s extended curve,
+   scaled to meet at `grey_in`. PsychoV-30 tends to the peak only as the light grows without bound
+   (half the peak around x = 3); on Vanilla+'s curve its highlights have Vanilla+'s brightness.
+   Below `grey_in` (the shadows) the slider changes nothing.
 2. **Bloom** added unbounded to that signal, then the color matrix, in Vanilla+'s order. PsychoV-30
    alone took the game's screen blend, `t + clamp(g) (1 - min(t, 1))`: its per-channel clamp turned
    an orange glow yellow-green. Measured on the spires before the sunset, green to red 1.03 against
@@ -82,26 +82,23 @@ display mapping), not its operator.
    luminance), anchored at `grey_in` with the game's slope as `cone_response_exponent`, as
    RenoDX's mods pass a vanilla slope **[RenoDX]**: its compression to the peak, purity, BT.2020
    target and gamut compression, and the menu's sliders as its own parameters.
-4. **Hue correction** to Vanilla+'s output for the same pixel, by the menu's **Hue Correction**
-   (`hdr_hue_correction`, 0 to 100 %; not set, the tone mapper's own: 0 % for PsychoV, 100 % for
-   PsychoV+). As RenoDX's `HueOKLab` (`colorcorrect.hlsl`): the (a, b) of PsychoV-30's color moved
-   towards the reference's by the strength, then scaled back to its chroma, so only the hue moves;
-   its final AP1 clamp is left out (the final pass's BT.2020 makes it moot). RenoDX's mods expose
-   the same as a Hue Correction slider (default 100 % in most, through RenoDRT); the Cyberpunk 2077
-   mod skips it for PsychoV, the FromSoftware Engine mod has its own hue emulation inside PsychoV.
-   PsychoV-30 compresses each cone's
-   response, so a bright orange (L far above M) moves towards yellow and a violet towards pink, as
-   the eye sees a strong light; the game's curve, per channel, keeps the artists' hues. In the game
-   the fires had turned yellow: OKLab hue 66 to 68 degrees between 100 and 400 nits, against
-   Vanilla+'s 55 to 59; with the correction 56 to 61 against 54 to 58 **[measured]**. Against the
-   game's own SDR image of the same fire (59 degrees in the flame body), PsychoV gives 59 at 0 %
-   and 51 at 100 % **[measured]**: 0 % is the game's hue in the body, 100 % Vanilla+'s more orange
-   one. The
-   reference is Vanilla+'s *final* color: its color before the roll-off made the brightest flames
-   redder than Vanilla+ itself (46 degrees at x = 2 against 76) and the red channel passed the
-   peak **[deduction]**.
+4. **Hue correction** to Vanilla+'s output for the same pixel, by Hue Correction. As RenoDX's
+   `HueOKLab` (`colorcorrect.hlsl`): the (a, b) of PsychoV-30's color moved towards the
+   reference's by the strength, then scaled back to its chroma, so only the hue moves; its final
+   AP1 clamp is left out (the final pass's BT.2020 makes it moot). RenoDX's mods expose the same as
+   a Hue Correction slider (default 100 % in most, through RenoDRT); the Cyberpunk 2077 mod skips
+   it for PsychoV, the FromSoftware Engine mod has its own hue emulation inside PsychoV.
+   PsychoV-30 compresses each cone's response, so a bright orange (L far above M) moves towards
+   yellow and a violet towards pink, as the eye sees a strong light; the game's curve, per
+   channel, keeps the artists' hues. In the game the fires had turned yellow: OKLab hue 66 to 68
+   degrees between 100 and 400 nits, against Vanilla+'s 55 to 59; with the correction 56 to 61
+   against 54 to 58 **[measured]**. Against the game's own SDR image of the same fire (59 degrees
+   in the flame body), PsychoV gives 59 at 0 % and 51 at 100 % **[measured]**: 0 % is the game's
+   hue in the body, 100 % Vanilla+'s more orange one. The reference is Vanilla+'s *final* color:
+   its color before the roll-off made the brightest flames redder than Vanilla+ itself (46 degrees
+   at x = 2 against 76) and the red channel passed the peak **[deduction]**.
 
-Where the composite has no curve to extend (its curve 3), both fall back to PsychoV-30 on the
+Where the composite has no curve to extend (its curve 3), PsychoV falls back to PsychoV-30 on the
 scene.
 
 ### Model
@@ -109,24 +106,25 @@ scene.
 `engine/docs/hdr-tools/psychov_check/psychov_model.cpp` (run by `run.sh`), with RenoDX's own
 test30: interiors (curve k 2.30, c 0.46: `grey_in` 0.19475, cone 1.1656), peak 1000 nits, Game
 Brightness 203, the color matrix left out. PsychoV-30 alone (the tone mapper of 0.9.38.1, with
-the game's screen-blended bloom and no hue correction) for reference **[deduction]**.
+the game's screen-blended bloom and no hue correction) for reference **[deduction]**. VH: Vanilla+
+Highlights.
 
-| Scene x | Game (SDR) | Vanilla+ | PsychoV-30 alone | PsychoV | PsychoV+ |
-|---:|---:|---:|---:|---:|---:|
-| 0.002 | | 0.27 nits | 0.15 | 0.15 | 0.15 |
-| 0.01 | 1.4 | 1.40 | 1.04 | 1.04 | 1.04 |
-| 0.18 | 33 | 33 | 33 | 33 | 33 |
-| 0.5 | 101 | 142 | 106 | 106 | 134 |
-| 1 | 166 | 439 | 215 | 215 | 373 |
-| 2 | 199 | 819 | 388 | 388 | 748 |
-| 4 | 203 | 965 | 595 | 595 | 948 |
-| 16 | 203 | 999 | 887 | 887 | 999 |
-| Nits gained from x = 4 to 8 | | +29 | +178 | +178 | +44 |
-| from x = 8 to 16 | | +5 | +115 | +115 | +7 |
+| Scene x | Game (SDR) | Vanilla+ | PsychoV-30 alone | PsychoV VH 0 % | VH 25 % | VH 50 % | VH 75 % | VH 100 % |
+|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| 0.002 | | 0.27 nits | 0.15 | 0.15 | 0.15 | 0.15 | 0.15 | 0.15 |
+| 0.01 | 1.4 | 1.40 | 1.04 | 1.04 | 1.04 | 1.04 | 1.04 | 1.04 |
+| 0.18 | 33 | 33 | 33 | 33 | 33 | 33 | 33 | 33 |
+| 0.5 | 101 | 142 | 106 | 106 | 113 | 119 | 126 | 134 |
+| 1 | 166 | 439 | 215 | 215 | 250 | 288 | 329 | 373 |
+| 2 | 199 | 819 | 388 | 388 | 483 | 579 | 669 | 748 |
+| 4 | 203 | 965 | 595 | 595 | 734 | 839 | 907 | 948 |
+| 16 | 203 | 999 | 887 | 887 | 964 | 989 | 997 | 999 |
+| Nits gained from x = 4 to 8 | | +29 | +178 | +178 | +160 | +116 | +74 | +44 |
+| from x = 8 to 16 | | +5 | +115 | +115 | +69 | +34 | +15 | +7 |
 
-Colors (nits / OKLab hue / chroma per lightness):
+Colors (nits / OKLab hue / chroma per lightness), PsychoV at both sliders' ends:
 
-| | Vanilla+ | PsychoV-30 alone | PsychoV | PsychoV+ |
+| | Vanilla+ | PsychoV-30 alone | PsychoV (VH 0, hue 0) | PsychoV (VH 100, hue 100) |
 |---|---|---|---|---|
 | Flame orange (1, 0.45, 0.08) x 1 | 179 / 55 / 0.223 | 115 / 71 / 0.187 | 115 / 71 / 0.187 | 148 / 55 / 0.185 |
 | x 2 | 446 / 76 / 0.192 | 231 / 72 / 0.178 | 231 / 72 / 0.178 | 413 / 76 / 0.160 |
@@ -135,14 +133,15 @@ Colors (nits / OKLab hue / chroma per lightness):
 | x 2 | 277 / 300 / 0.246 | 166 / 295 / 0.180 | 166 / 295 / 0.180 | 256 / 300 / 0.148 |
 | Dark spire under a strong orange glow (green / red) | 213, 0.66 | 178, 0.96 | 198, 0.62 | 198, 0.64 |
 
-No color is above the peak or outside BT.2020 in PsychoV's or PsychoV+'s output. Without bloom,
-PsychoV is PsychoV-30 alone exactly; it differs only where the bloom adds light (the glow stays
-orange).
+No color is above the peak or outside BT.2020 in PsychoV's output. At both sliders' 0 and
+without bloom, PsychoV is PsychoV-30 alone exactly; it differs where the bloom adds light (the
+glow stays orange).
 
 ### In the game
 
-HDR captures of PsychoV+ against Vanilla+ (Xbox Game Bar JXR, 30/10/2026; peak 1037 nits, the
-same settings at 50 in both presets) **[measured]**:
+HDR captures of PsychoV with both sliders at 100 % (0.9.38.2's PsychoV) against Vanilla+ (Xbox
+Game Bar JXR, 30/10/2026; peak 1037 nits, the same settings at 50 in both presets)
+**[measured]**:
 
 - **Moon, Yharnam at night**: 786 nits (median of the disc) against Vanilla+'s 870. The moon is
   between 1 and 3 times the game's white in the scene, where PsychoV's shoulder sits below
@@ -159,16 +158,17 @@ same settings at 50 in both presets) **[measured]**:
   lower around 100 to 400 nits (fire 0.139 against 0.168). That is PsychoV-30's purity near the
   peak; the Saturation slider raises it.
 
-So, against Vanilla+, PsychoV+ has PsychoV-30's shadows, Vanilla+'s brightness for the brightest
-lights, mid-bright sources (the moon, lamps) about 10 % lower, more gradation near the peak (+44
-against +29 nits from x = 4 to 8), Vanilla+'s hues, softer colors near the peak. PsychoV has
+So, against Vanilla+: at Vanilla+ Highlights 100 %, PsychoV-30's shadows, Vanilla+'s brightness
+for the brightest lights, mid-bright sources (the moon, lamps) about 10 % lower, more gradation
+near the peak (+44 against +29 nits from x = 4 to 8), softer colors near the peak. At 0 %,
 PsychoV-30's whole curve: half Vanilla+'s nits around the game's white (215 against 439 at x = 1),
-much more gradation near the peak (+178 nits from x = 4 to 8); its Highlights slider at 60 to 70
-gives 290 to 377 nits at x = 1.
+much more gradation near the peak (+178 nits from x = 4 to 8). In between, the table above; the
+Highlights slider (PsychoV-30's own highlight grading) at 60 to 70 gives 290 to 377 nits at x = 1
+too, through PsychoV-30's shoulder instead of Vanilla+'s curve.
 
 ## PsychoV-30's integration
 
-Kept in PsychoV and PsychoV+, which call the same port:
+Kept in PsychoV, which calls the same port:
 
 - **The game's slope as `cone_response_exponent`** (corrected in this beta). test30 takes its cone
   power as `contrast * cone_response_exponent` but its purity as `purity_scale / contrast`
@@ -198,6 +198,8 @@ Kept in PsychoV and PsychoV+, which call the same port:
   clamped per channel (glows turned yellow-green). PsychoV is the same with the bloom fixed.
 - **Vanilla+'s hues by default in PsychoV**: fires orange, but PsychoV-30's own hue is the
   game's in the flame body (above); it is the Hue Correction slider's 100 % instead.
+- **PsychoV+ as a third tone mapper** (0.9.38.3 before its release): PsychoV with Vanilla+'s
+  curve and hues. It is PsychoV with both sliders at 100 %, so the sliders replaced it.
 - **PsychoV-17** (RenoDX's `psychotm_test17`, ported and checked within 7e-6, set as RenoDX's
   Starfield mod sets it): on greys PsychoV-30's curve exactly, its colors a little paler in the
   brightest saturated lights; the same as PsychoV-30 in the game. Removed before release.
@@ -206,7 +208,7 @@ Kept in PsychoV and PsychoV+, which call the same port:
 - **The FromSoftware Engine mod's own operator** (Ritsu; Elden Ring, Nightreign, Sekiro, Armored
   Core VI: a per-cone Reinhard with the luminance restored and Neutwo on the largest channel),
   compiled unchanged on Vanilla+'s extended curve: brighter than Vanilla+ up to x = 4 (927 against
-  819 nits at x = 2), flat at the peak above it, flame saturation 0.49 at x = 5. PsychoV+ keeps its
+  819 nits at x = 2), flat at the peak above it, flame saturation 0.49 at x = 5. PsychoV (Vanilla+ Highlights) keeps its
   structure with PsychoV-30.
 - **PsychoV-30 after Vanilla+'s bloom and matrix with the game's curve below mid grey**, and
   **PsychoV-30 driven to Vanilla+'s luminance**: Vanilla+'s shadows (not PsychoV-30's), whiter
@@ -216,15 +218,15 @@ None was taken as better for reaching the peak more often.
 
 ## Checks run
 
-- Engine build, settings tests (`hdr_tonemapper` 4 and 7 kept, 0, 2, 3 and 6 read as Vanilla+;
-  `hdr_hue_correction` not set by default, then 0 % for PsychoV and 100 % for PsychoV+, a value
-  set kept per preset, clamped to 0..100, below 0 back to not set), the host shader
+- Engine build, settings tests (`hdr_tonemapper` 4 kept, 7 read as 4 with both sliders at 100 %,
+  0, 2, 3 and 6 read as Vanilla+; `hdr_vplus_highlights` and `hdr_hue_correction` 0 by default,
+  kept per preset, clamped to 0..100, a Hue Correction below 0 ignored), the host shader
   configurations compiled and validated (`shader_check.py`).
 - `engine/docs/hdr-tools/psychov_check/run.sh`: the GLSL PsychoV-30 against RenoDX's HLSL compiled
   unchanged, on 791 colors (grey ramp 1e-4..1e4, 18 hues at 40 levels, out-of-gamut, extremes):
   max difference 2e-4 of the color's largest channel over 9 configurations; no NaN or infinite
   value; the grey ramp monotonic and continuous. Then `psychov_model.cpp`: the tables above.
-- HDR captures in the game, Vanilla+ against PsychoV+ at each step (above).
+- HDR captures in the game, Vanilla+ against PsychoV (both sliders at 100 %) at each step (above).
 - The game's color table, read back from the GPU by the log line (0.9.38.3): a 16x16x16
   `R32G32B32A32Sfloat` table that grades the image a little, mean change 4.6/255 against a neutral
   table, largest 18/255, slightly warm (white 255, 251, 243; mid grey 137, 138, 134 for 136)
@@ -240,7 +242,7 @@ the tone mapper; no upscaler first, then the one you use.
 
 1. Places: a lantern in a dark street (Central Yharnam), a fire, the moon (Hunter's Dream /
    Cathedral Ward), the sun at the Grand Cathedral, a dark interior.
-2. For Vanilla+, PsychoV and PsychoV+, Bloom 50 then 0:
+2. For Vanilla+ and PsychoV (its sliders at 0 then 100 %), Bloom 50 then 0:
    - an HDR screenshot (Xbox Game Bar, Win+Alt+PrtScn: a JXR) for nits; read the luminance and the
      largest channel separately (they differ for colors: a red at 1000 nits in its red channel is
      about 260 nits of luminance), and the hue in OKLab;
