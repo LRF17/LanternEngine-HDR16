@@ -1064,10 +1064,10 @@ index 0000000..5bbaf8f
 +#endif // BBPORT_BB_COMPOSITE_GLSL
 diff --git a/gpu/shadps4/video_core/host_shaders/hdr/bb_composite_hdr.frag b/gpu/shadps4/video_core/host_shaders/hdr/bb_composite_hdr.frag
 new file mode 100644
-index 0000000..37d6ac6
+index 0000000..a0b617e
 --- /dev/null
 +++ b/gpu/shadps4/video_core/host_shaders/hdr/bb_composite_hdr.frag
-@@ -0,0 +1,408 @@
+@@ -0,0 +1,406 @@
 +// SPDX-FileCopyrightText: Copyright 2026 bbport
 +// SPDX-License-Identifier: GPL-2.0-or-later
 +//
@@ -1198,11 +1198,14 @@ index 0000000..37d6ac6
 +}
 +
 +// Mode 5, tone mapper PsychoV30 (scene): PsychoV30 alone on the scene's linear color, in place of
-+// the game's curve, to the display's peak (the final pass then only encodes). Anchored at
-+// the game's mid grey, with its slope there as contrast. The menu's exposure, highlights,
-+// shadows, contrast and saturation are PsychoV30's own parameters, and its target gamut
-+// (BT.2020 by default, as RenoDX's HDR mods; BT.709). PsychoV30 (pure): the same, without the
-+// match of the shadows to the game's.
++// the game's curve, to the display's peak (the final pass then only encodes). Anchored where the
++// game's curve gives mid grey (0.18), with the game's log-log slope there (x V'(x) / V(x)) as
++// cone_response_exponent, as RenoDX's mods pass a vanilla slope (cp2077, orderofthesinkingstar):
++// test30's cone power is contrast * cone_response_exponent but its purity purity_scale /
++// contrast, so the game's slope passed as contrast also took purity down (by 1 / 1.05 to
++// 1 / 1.17 in the scenes measured). The menu's exposure, highlights, shadows, contrast and
++// saturation are PsychoV30's own parameters (neutral at 1), its target gamut BT.2020, as
++// RenoDX's HDR mods.
 +bool bb_curve_psychov_scene(BbComposite o, vec3 x, out vec3 t) {
 +    float grey_in, slope;
 +    if (!bb_knee(o.curve, 0.18, grey_in, slope)) {
@@ -1214,25 +1217,20 @@ index 0000000..37d6ac6
 +    float highlights = bb_bits(push_data.bb_hdr2a.z, 1.0);
 +    float shadows = bb_bits(push_data.bb_hdr2a.w, 1.0);
 +    float game_contrast = clamp(grey_in * slope / 0.18, 0.3, 3.0);
-+    float user_contrast = bb_bits(push_data.bb_hdr2b.x, 1.0);
-+    float contrast = game_contrast * user_contrast;
++    float contrast = bb_bits(push_data.bb_hdr2b.x, 1.0);
 +    float purity = bb_bits(push_data.bb_hdr2b.y, 1.0);
-+    // Both calls below take the same gamut and compressions: the shadow match's ratio compares
-+    // them. bb_hdr2b.z: the gamut + 2 for the pure mode, + 1; bb_hdr2b.w: gamut compression and
-+    // compression in 1/10000, bit 31 set (0: RenoDX's defaults, 1 and 1).
-+    int choice = bb_choice(push_data.bb_hdr2b.z, 1);
-+    int gamut = clamp(choice & 1, 0, 1);
-+    bool pure = (choice & 2) != 0;
++    // bb_hdr2b.z: the gamut (1 BT.2020) plus the tone mapper's bits, + 1; bb_hdr2b.w: gamut
++    // compression and compression in 1/10000, bit 31 set (0: RenoDX's defaults, 1 and 1).
++    int gamut = clamp(bb_choice(push_data.bb_hdr2b.z, 1) & 1, 0, 1);
 +    uint packed = push_data.bb_hdr2b.w;
 +    float gamut_compression = packed == 0u ? 1.0 : float(packed & 0xFFFFu) / 10000.0;
 +    float compression = packed == 0u ? 1.0 : float((packed >> 16u) & 0x7FFFu) / 10000.0;
-+    vec3 game = bb_curve(o, x);
 +    if (o.curve != 3) {
 +        x = max(x, BB_FLOOR); // PsychoV30 needs a positive input
 +    }
-+    t = rd_psychov30(x, peak, exposure, highlights, shadows, max(contrast, 0.05), purity, 1.0,
-+                     vec3(grey_in), vec3(0.18), gamut_compression, gamut, compression,
-+                     RD_PSY30_SOURCE_BOUNDARY_BT709);
++    t = rd_psychov30(x, peak, exposure, highlights, shadows, max(contrast, 0.05), purity,
++                     game_contrast, vec3(grey_in), vec3(0.18), gamut_compression, gamut,
++                     compression, RD_PSY30_SOURCE_BOUNDARY_BT709);
 +    // BT.2020: a color outside BT.709 has BT.709 channels below 0. They are kept, signed, through
 +    // the 16-bit chain to the final pass, which converts to BT.2020 before it drops what is still
 +    // negative (as RenoDX's mods). BT.709: within the cube, as before.
