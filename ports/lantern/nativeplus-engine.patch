@@ -6988,7 +6988,7 @@ index e619502..c18d0ee 100644
  
  enum SchedulerType {
 diff --git a/gpu/shadps4/video_core/renderer_vulkan/vk_rasterizer.cpp b/gpu/shadps4/video_core/renderer_vulkan/vk_rasterizer.cpp
-index 265de16..10c8a2b 100644
+index 265de16..7d3ef26 100644
 --- a/gpu/shadps4/video_core/renderer_vulkan/vk_rasterizer.cpp
 +++ b/gpu/shadps4/video_core/renderer_vulkan/vk_rasterizer.cpp
 @@ -1,3 +1,4 @@
@@ -7014,7 +7014,27 @@ index 265de16..10c8a2b 100644
      scene_targets = std::make_unique<SceneTargets>(instance, scheduler, runtime, texture_cache);
      // Allocation is independent of shader compilation, including constructor-time precache.
      object_motion = std::make_unique<ObjectMotion>(instance, scheduler);
-@@ -2061,6 +2066,23 @@ void Rasterizer::DrawRecord(const GraphicsPipeline* pipeline, const PreparedDraw
+@@ -1891,6 +1896,11 @@ void Rasterizer::DrawRecord(const GraphicsPipeline* pipeline, const PreparedDraw
+         FrameCapture::Poll();
+         scheduler.PopPendingOperations();
+     }
++    // bbport: the color table the ColorGrading pass just drew with (NoteColorTable), read now
++    // that the pass is recorded.
++    if (color_table_pending) {
++        ReadColorTable(std::exchange(color_table_pending, VAddr{0}));
++    }
+     // bbport: under SET_PREDICATION on a block known to read occluded (vk_occlusion.h).
+     if (occlusion && occlusion->SkipDraw()) {
+         return;
+@@ -1900,6 +1910,7 @@ void Rasterizer::DrawRecord(const GraphicsPipeline* pipeline, const PreparedDraw
+     if (const u32 frame = BbStats::frame_number.load(std::memory_order_relaxed);
+         frame != preupload_frame) {
+         preupload_frame = frame;
++        CheckColorTablePresence();
+         BB_SECTION(Preupload);
+         static const u64 budget = [] {
+             const char* env = std::getenv("BB_PREUPLOAD_MB");
+@@ -2061,6 +2072,24 @@ void Rasterizer::DrawRecord(const GraphicsPipeline* pipeline, const PreparedDraw
              });
          }
      }
@@ -7027,6 +7047,7 @@ index 265de16..10c8a2b 100644
 +            const float strength =
 +                std::clamp(BbSettings::Get().hdr_scene_grading.load(), 0.0f, 100.0f) / 100.0f;
 +            push_data.bb_hdr[3] = std::bit_cast<u32>(strength) + 1u;
++            NoteColorTable(*ps);
 +        }
 +        // The chain probe (in-game menu, test): which stage shows itself in color.
 +        if (const auto* ps = pipeline->GetStages()[u32(Shader::SwStage::Fragment)];
@@ -7038,7 +7059,7 @@ index 265de16..10c8a2b 100644
      pipeline->BindResources(set_writes, push_data, {image_infos.data(), image_infos.size()},
                              {buffer_infos.data(), buffer_infos.size()});
      if (pipeline->GetGraphicsKey().motion_vectors) {
-@@ -2126,6 +2148,83 @@ void Rasterizer::DrawRecord(const GraphicsPipeline* pipeline, const PreparedDraw
+@@ -2126,6 +2155,83 @@ void Rasterizer::DrawRecord(const GraphicsPipeline* pipeline, const PreparedDraw
              cmdbuf.endQuery(query.pool, query.index);
          }
      });
@@ -7122,7 +7143,7 @@ index 265de16..10c8a2b 100644
      if (FrameCapture::Active()) {
          const auto* ps = pipeline->GetStages()[u32(Shader::SwStage::Fragment)];
          FrameCapture::Draw(vs_info.pgm_hash, ps ? ps->pgm_hash : 0, num_indices, num_instances);
-@@ -3318,6 +3417,32 @@ bool Rasterizer::IsComputeImageCopy(const Pipeline* pipeline) {
+@@ -3318,6 +3424,32 @@ bool Rasterizer::IsComputeImageCopy(const Pipeline* pipeline) {
      // Perform image copy
      VideoCore::Image& src_image = desc0.is_written ? image1 : image0;
      VideoCore::Image& dst_image = desc0.is_written ? image0 : image1;
@@ -7155,7 +7176,7 @@ index 265de16..10c8a2b 100644
      runtime.CopyColorAndDepth(&src_image, &dst_image);
      return true;
  }
-@@ -4260,6 +4385,9 @@ vk::Sampler Rasterizer::CachedSampler(const AmdGpu::Sampler& sharp, bool is_dept
+@@ -4260,6 +4392,9 @@ vk::Sampler Rasterizer::CachedSampler(const AmdGpu::Sampler& sharp, bool is_dept
  // The sampler that reads each image is not known here: any point sampler counts.
  // BB_PROXY_POINT_NATIVE=0 (or experiment bit 0): proxies are read regardless, as before.
  bool Rasterizer::PointReadsNative(const Shader::Info& stage, const PreparedStage* prepared) const {
@@ -7165,7 +7186,7 @@ index 265de16..10c8a2b 100644
      static const bool enabled = [] {
          const char* env = std::getenv("BB_PROXY_POINT_NATIVE");
          return !(env && env[0] == '0');
-@@ -4748,6 +4876,35 @@ RenderState Rasterizer::BeginRenderingFull(const GraphicsPipeline* pipeline) {
+@@ -4748,6 +4883,35 @@ RenderState Rasterizer::BeginRenderingFull(const GraphicsPipeline* pipeline) {
                            !same_size(texture_cache.GetImage(db_desc.first), 0))) {
          reduced = false;
      }
@@ -7201,7 +7222,7 @@ index 265de16..10c8a2b 100644
      if (debug_pass) {
          if (db_desc.first) {
              const auto& depth = texture_cache.GetImage(db_desc.first);
-@@ -4757,7 +4914,7 @@ RenderState Rasterizer::BeginRenderingFull(const GraphicsPipeline* pipeline) {
+@@ -4757,7 +4921,7 @@ RenderState Rasterizer::BeginRenderingFull(const GraphicsPipeline* pipeline) {
          }
          std::printf("Scene pass: reduced %d %s\n", reduced, why.c_str());
      }
@@ -7210,7 +7231,7 @@ index 265de16..10c8a2b 100644
      if (BbStats::enabled) {
          BbStats::reduced_draws.fetch_add(reduced, std::memory_order_relaxed);
          BbStats::scene_draws.fetch_add(scene_started, std::memory_order_relaxed);
-@@ -4973,13 +5130,13 @@ RenderState Rasterizer::BeginRenderingFull(const GraphicsPipeline* pipeline) {
+@@ -4973,13 +5137,13 @@ RenderState Rasterizer::BeginRenderingFull(const GraphicsPipeline* pipeline) {
          state.num_layers = 1;
      }
  
@@ -7226,7 +7247,7 @@ index 265de16..10c8a2b 100644
          ui_pass.active = false; // the memo keeps this scale for the pass
      }
      if (FrameCapture::Active()) {
-@@ -5005,8 +5162,18 @@ void Rasterizer::Resolve() {
+@@ -5005,8 +5169,18 @@ void Rasterizer::Resolve() {
      const auto& mrt1_hint = CbExtent(1);
      VideoCore::TextureCache::ImageDesc mrt0_desc{Regs().color_buffers[0], mrt0_hint};
      VideoCore::TextureCache::ImageDesc mrt1_desc{Regs().color_buffers[1], mrt1_hint};
@@ -7247,7 +7268,7 @@ index 265de16..10c8a2b 100644
  
      ScopeMarkerBegin(fmt::format("Resolve:MRT0={:#x}:MRT1={:#x}",
                                   Regs().color_buffers[0].Address(),
-@@ -5601,7 +5768,12 @@ void Rasterizer::UpdateRasterizationState() const {
+@@ -5601,7 +5775,12 @@ void Rasterizer::UpdateRasterizationState() const {
  void Rasterizer::UpdateColorBlendingState(const GraphicsPipeline* pipeline) const {
      const auto& regs = Regs();
      auto& dynamic_state = scheduler.GetDynamicState();
@@ -7261,6 +7282,222 @@ index 265de16..10c8a2b 100644
      dynamic_state.SetColorWriteMasks(pipeline->GetGraphicsKey().write_masks);
      dynamic_state.SetAttachmentFeedbackLoopEnabled(attachment_feedback_loop);
  }
+@@ -5720,6 +5899,183 @@ void Rasterizer::ReportUboStats() {
+     frames = 0;
+ }
+ 
++namespace {
++u64 SteadyMs() {
++    return static_cast<u64>(std::chrono::duration_cast<std::chrono::milliseconds>(
++                                std::chrono::steady_clock::now().time_since_epoch())
++                                .count());
++}
++
++bool ColorTableLog() {
++    static const bool on = [] {
++        const char* env = std::getenv("BB_COLOR_TABLE_LOG");
++        return !(env && env[0] == '0');
++    }();
++    return on;
++}
++
++float HalfToFloat(u16 h) {
++    const u32 sign = u32(h >> 15) << 31, exponent = (h >> 10) & 0x1f, mantissa = h & 0x3ff;
++    if (exponent == 0) {
++        const float value = float(mantissa) * (1.0f / 16777216.0f); // subnormal: m 2^-24
++        return sign ? -value : value;
++    }
++    if (exponent == 31) {
++        return std::bit_cast<float>(sign | 0x7f800000u | (mantissa << 13));
++    }
++    return std::bit_cast<float>(sign | ((exponent + 112) << 23) | (mantissa << 13));
++}
++
++// The game's 16x16x16 color table (texel (r, g, b) at x + 16 (y + 16 z)) against a neutral one
++// (texel = its coordinates / 15), in the table's own encoding, as 8-bit steps.
++void LogColorTable(const u8* data, vk::Format format, VAddr address, std::atomic<u64>& last) {
++    const u32 texel_bytes = format == vk::Format::eR16G16B16A16Sfloat ? 8 : 4;
++    const u64 hash = XXH3_64bits(data, 16 * 16 * 16 * texel_bytes);
++    if (last.exchange(hash) == hash) {
++        return;
++    }
++    const auto texel = [&](u32 x, u32 y, u32 z) {
++        const u8* t = data + (x + 16 * (y + 16 * z)) * texel_bytes;
++        std::array<float, 3> c{};
++        switch (format) {
++        case vk::Format::eR16G16B16A16Sfloat:
++            for (u32 i = 0; i < 3; ++i) {
++                c[i] = HalfToFloat(u16(t[2 * i] | (t[2 * i + 1] << 8)));
++            }
++            break;
++        case vk::Format::eB8G8R8A8Unorm:
++        case vk::Format::eB8G8R8A8Srgb:
++            c = {t[2] / 255.0f, t[1] / 255.0f, t[0] / 255.0f};
++            break;
++        case vk::Format::eA2B10G10R10UnormPack32: {
++            const u32 v = t[0] | (t[1] << 8) | (t[2] << 16) | (u32(t[3]) << 24);
++            c = {(v & 0x3ff) / 1023.0f, ((v >> 10) & 0x3ff) / 1023.0f, ((v >> 20) & 0x3ff) / 1023.0f};
++            break;
++        }
++        default:
++            c = {t[0] / 255.0f, t[1] / 255.0f, t[2] / 255.0f};
++            break;
++        }
++        return c;
++    };
++    double sum = 0.0, largest = 0.0, brightness = 0.0, saturation = 0.0;
++    u32 saturated = 0;
++    for (u32 z = 0; z < 16; ++z) {
++        for (u32 y = 0; y < 16; ++y) {
++            for (u32 x = 0; x < 16; ++x) {
++                const auto out = texel(x, y, z);
++                const std::array<float, 3> in{x / 15.0f, y / 15.0f, z / 15.0f};
++                for (u32 i = 0; i < 3; ++i) {
++                    const double d = std::abs(double(out[i]) - in[i]);
++                    sum += d;
++                    largest = std::max(largest, d);
++                }
++                brightness += 0.2126 * (out[0] - in[0]) + 0.7152 * (out[1] - in[1]) +
++                              0.0722 * (out[2] - in[2]);
++                const float in_range = std::max({in[0], in[1], in[2]}) - std::min({in[0], in[1], in[2]});
++                if (in_range >= 0.2f) {
++                    saturation += (std::max({out[0], out[1], out[2]}) -
++                                   std::min({out[0], out[1], out[2]})) / in_range;
++                    ++saturated;
++                }
++            }
++        }
++    }
++    const auto grey = [&](u32 i) {
++        const auto c = texel(i, i, i);
++        return fmt::format("({:.0f}, {:.0f}, {:.0f})", c[0] * 255.0f, c[1] * 255.0f, c[2] * 255.0f);
++    };
++    const double mean = sum / (16 * 16 * 16 * 3) * 255.0;
++    std::printf("Color table %#llx (%s): %s; against a neutral table, mean change %.1f/255, largest "
++                "%.0f/255, brightness %+.1f/255, saturation x%.2f; greys black %s, mid %s (neutral "
++                "136), white %s, per 255\n",
++                static_cast<unsigned long long>(address), vk::to_string(format).c_str(),
++                largest * 255.0 < 2.0 ? "neutral (Color Grade Strength changes nothing here)"
++                                      : "grades the image",
++                mean, largest * 255.0, brightness / (16 * 16 * 16) * 255.0,
++                saturated ? saturation / saturated : 1.0, grey(0).c_str(), grey(8).c_str(),
++                grey(15).c_str());
++}
++} // namespace
++
++void Rasterizer::NoteColorTable(const Shader::Info& stage) {
++    if (!ColorTableLog()) {
++        return;
++    }
++    const u64 now = SteadyMs();
++    if (color_table_gone) {
++        std::printf("Color table: the game draws its color grading pass again\n");
++        color_table_gone = false;
++    }
++    color_table_seen_ms = now;
++    if (now < color_table_next_ms) {
++        return;
++    }
++    for (const auto& image : stage.images) {
++        const auto sharp = image.GetSharp(stage);
++        if (sharp.GetType() == AmdGpu::ImageType::Color3D) {
++            color_table_pending = sharp.Address();
++            color_table_next_ms = now + 2000;
++            return;
++        }
++    }
++}
++
++void Rasterizer::CheckColorTablePresence() {
++    if (!ColorTableLog() || color_table_gone || color_table_seen_ms == 0) {
++        return;
++    }
++    if (SteadyMs() > color_table_seen_ms + 3000) {
++        std::printf("Color table: the game has not drawn its color grading pass for 3 s (no grading "
++                    "here: Color Grade Strength has nothing to change)\n");
++        color_table_gone = true;
++        color_table_hash->store(0);
++    }
++}
++
++void Rasterizer::ReadColorTable(VAddr address) {
++    const VideoCore::ImageId id = texture_cache.FindImageFromRange(address, 1, false);
++    if (!id) {
++        return;
++    }
++    VideoCore::Image& image = texture_cache.GetImage(id);
++    const auto& info = image.info;
++    const vk::Format format = info.pixel_format;
++    const bool known = format == vk::Format::eR8G8B8A8Unorm || format == vk::Format::eR8G8B8A8Srgb ||
++                       format == vk::Format::eB8G8R8A8Unorm || format == vk::Format::eB8G8R8A8Srgb ||
++                       format == vk::Format::eA2B10G10R10UnormPack32 ||
++                       format == vk::Format::eR16G16B16A16Sfloat;
++    if (info.size.width != 16 || info.size.height != 16 || info.size.depth != 16 || !known) {
++        static bool told = false;
++        if (!std::exchange(told, true)) {
++            std::printf("Color table %#llx: %ux%ux%u %s, not read (16x16x16 RGBA expected)\n",
++                        static_cast<unsigned long long>(address), info.size.width,
++                        info.size.height, info.size.depth, vk::to_string(format).c_str());
++        }
++        return;
++    }
++    const u64 size = 16 * 16 * 16 * (format == vk::Format::eR16G16B16A16Sfloat ? 8 : 4);
++    const auto staging = runtime.GetStagingPool().Request(size, VideoCore::MemoryType::HostCached,
++                                                          16, true);
++    const vk::BufferImageCopy copy = {
++        .bufferOffset = staging.offset,
++        .bufferRowLength = 0,
++        .bufferImageHeight = 0,
++        .imageSubresource = {.aspectMask = vk::ImageAspectFlagBits::eColor,
++                             .mipLevel = 0,
++                             .baseArrayLayer = 0,
++                             .layerCount = 1},
++        .imageOffset = {0, 0, 0},
++        .imageExtent = {16, 16, 16},
++    };
++    runtime.DownloadImage(&image, staging.buffer, std::span{&copy, 1});
++    scheduler.DeferPriorityOperation([this, staging, format, address, last = color_table_hash] {
++        staging.Invalidate();
++        LogColorTable(staging.mapped, format, address, *last);
++        runtime.GetStagingPool().FreeDeferred(staging);
++    });
++}
++
+ void Rasterizer::NoteFrameStart() {
+     if (auto* profiler = GpuProfiler::Get()) {
+         profiler->BeginFrame();
+diff --git a/gpu/shadps4/video_core/renderer_vulkan/vk_rasterizer.h b/gpu/shadps4/video_core/renderer_vulkan/vk_rasterizer.h
+index f839674..7f4daef 100644
+--- a/gpu/shadps4/video_core/renderer_vulkan/vk_rasterizer.h
++++ b/gpu/shadps4/video_core/renderer_vulkan/vk_rasterizer.h
+@@ -525,6 +525,14 @@ private:
+ 
+     /// Display pass: counts the frame (BbStats::gpu_frames) and, with BB_BUFFER_STATS, the lag.
+     void NoteFrameStart();
++    /// Native+ diagnostic (BB_COLOR_TABLE_LOG=0 turns it off): the game's color table, the
++    /// ColorGrading pass's 16x16x16 3D texture, read back at most every 2 s and logged when it
++    /// changes (how far from a neutral table), and a line when the pass stops being drawn: tells a
++    /// place without grading from a neutral table. NoteColorTable marks it in the pass's draw;
++    /// the next draw reads it (after the pass is recorded); NoteFrameStart checks its absence.
++    void NoteColorTable(const Shader::Info& stage);
++    void ReadColorTable(VAddr address);
++    void CheckColorTablePresence();
+     /// BB_GPU_PROFILE: a timestamp where a render pass starts (vk_gpu_profiler.h).
+     void MarkPass(const GraphicsPipeline* pipeline, const RenderState& state);
+     void BindVertexBuffers(const GraphicsPipeline* pipeline,
+@@ -822,6 +830,12 @@ private:
+     bool pipeline_is_compute = false; ///< bbport: the bound pipeline of BindResources
+     bool scene_debug_frame = false; ///< BB_SCENE_DEBUG: this frame's passes are printed
+     u32 preupload_frame = ~0u; ///< bbport: frame of the last background pre-upload
++    VAddr color_table_pending = 0;   ///< NoteColorTable: the table to read at the next draw
++    u64 color_table_next_ms = 0;     ///< NoteColorTable: no read before this (steady ms)
++    u64 color_table_seen_ms = 0;     ///< the pass's last draw (steady ms; 0 never)
++    bool color_table_gone = false;   ///< CheckColorTablePresence: the absence is logged
++    std::shared_ptr<std::atomic<u64>> color_table_hash =
++        std::make_shared<std::atomic<u64>>(0); ///< the last table logged (read-back thread)
+     bool PendingWriteOverlaps(VAddr address, u64 size);
+     /// Stage B: the ring bindings of the stages of the packet being recorded.
+     struct RingStage {
 diff --git a/gpu/shadps4/video_core/renderer_vulkan/vk_scene_resolution.cpp b/gpu/shadps4/video_core/renderer_vulkan/vk_scene_resolution.cpp
 index 932980b..d21a7ce 100644
 --- a/gpu/shadps4/video_core/renderer_vulkan/vk_scene_resolution.cpp
