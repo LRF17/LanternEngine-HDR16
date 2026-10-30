@@ -6,9 +6,9 @@ your display's peak, with an in-game menu laid out like a RenoDX mod. Three tone
 
 - **Vanilla+** (default), by **souperman9**, from his RenoDX Bloodborne mod: the game's own image,
   with brighter highlights up to your display's peak.
-- **PsychoV**: RenoDX's PsychoV-30 with the game's bloom kept: deeper blacks, softer highlights
-  with the most detail near the peak.
-- **PsychoV+**: PsychoV with Vanilla+'s brightness and hues for the brightest lights.
+- **PsychoV**: RenoDX's PsychoV-30 with the game's bloom and hues kept: deeper blacks, softer
+  highlights with the most detail near the peak.
+- **PsychoV+**: PsychoV with Vanilla+'s brightness for the brightest lights.
 
 Native+ works with Lantern's upscalers and with frame generation (DLSS and FSR 3.1). Lantern's
 own README and credits are in [README-Lantern.md](README-Lantern.md).
@@ -117,14 +117,14 @@ replace them.
   mid-highlights than the game's and the brightest highlights; the very brightest lights turn
   white.
 - **PsychoV**: RenoDX's PsychoV-30 on the game's scene, anchored where the game's curve gives mid
-  grey, with the game's contrast there, then a perceptual shoulder to your display's peak. The
-  game's bloom is added before the compression, so an orange glow stays orange. Deeper shadows
-  than the game's, softer highlights that keep the most gradation near the peak; very bright
-  fires turn a little yellower, as PsychoV-30 renders a strong light.
-- **PsychoV+**: PsychoV with Vanilla+'s curve above mid grey, compressed by PsychoV-30, and
-  Vanilla+'s hues (RenoDX's hue correction: fires stay orange): PsychoV's shadows, Vanilla+'s
-  brightness for the brightest lights (the sun reaches the peak), the moon and lamps about 10 %
-  below Vanilla+.
+  grey, with the game's contrast there, then a perceptual shoulder to your display's peak. Two
+  things are kept from the game: its bloom (added before the compression, so an orange glow
+  stays orange) and its hues (RenoDX's hue correction, so fires stay orange as in the game's SDR
+  image). Deeper shadows than the game's, softer highlights that keep the most gradation near the
+  peak.
+- **PsychoV+**: PsychoV with Vanilla+'s curve above mid grey, compressed by PsychoV-30: PsychoV's
+  shadows, Vanilla+'s brightness for the brightest lights (the sun reaches the peak), the moon
+  and lamps about 10 % below Vanilla+.
 
 Every color stays within BT.2020 and under the peak with both PsychoV. Their colors are softer
 than Vanilla+'s near the peak (their **Saturation** raises them). How each was built and
