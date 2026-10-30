@@ -242,7 +242,7 @@ namespace BloodborneLauncher.Core
                 "Native+ HDR by LRF17 (github.com/LRF17/LanternEngine-NativePlusHDR). Tone mappers: Vanilla+ by souperman9 (from his RenoDX Bloodborne mod); PsychoV and PsychoV+ built on PsychoV-30 and the hue correction from RenoDX (© 2026 Carlos Lopez, MIT License, github.com/clshortfuse/renodx)."),
         };
 
-        /// <summary>hdr_tonemapper with Native+ (hdr_mode=nativeplus): 5 Vanilla+ (souperman9's, from his RenoDX Bloodborne mod; the default), 4 PsychoV (RenoDX's PsychoV-30 with Vanilla+'s bloom and hues) or 7 PsychoV+ (PsychoV with Vanilla+'s curve above mid grey).</summary>
+        /// <summary>hdr_tonemapper with Native+ (hdr_mode=nativeplus): 5 Vanilla+ (souperman9's, from his RenoDX Bloodborne mod; the default), 4 PsychoV (RenoDX's PsychoV-30 with Vanilla+'s bloom) or 7 PsychoV+ (PsychoV with Vanilla+'s curve above mid grey and its hues).</summary>
         public static readonly Choice[] HdrToneMapper =
         {
             // The segmented buttons show the label up to " (".
